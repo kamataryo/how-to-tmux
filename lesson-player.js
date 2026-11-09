@@ -10,6 +10,7 @@ const POLL_INTERVAL = 300;
 const KEY_LABELS = { Left: '←', Right: '→', Up: '↑', Down: '↓' };
 const ENV_STOPPED = 99; // course.alive が失敗したときの check の終了コード
 const ENV_STOPPED_MESSAGE = '環境が止まっています。「このレッスンをやり直す」を押してください。';
+const STEP_MOVE = { duration: 500, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' };
 
 const $ = (id) => document.getElementById(id);
 const terminal = document.querySelector('tmux-terminal');
@@ -34,6 +35,24 @@ function folded(label, ...content) {
   return details;
 }
 
+const pinSteps = () => ($('steps').scrollTop = $('steps').scrollHeight);
+
+// 手順の欄を変更し、各行を今見えている位置から新しい位置へなめらかに動かす（FLIP）。新しい行は欄の下から現れる。
+// 動いている途中の位置から始めるので、続けて呼んでも 1 つの動きにつながる
+function moveSteps(change) {
+  const steps = $('steps');
+  const before = new Map([...steps.children].map((item) => [item, item.getBoundingClientRect().top]));
+  steps.getAnimations({ subtree: true }).forEach((animation) => animation instanceof CSSTransition || animation.cancel()); // 行の色の変化は残す
+  change();
+  pinSteps();
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const { bottom } = steps.getBoundingClientRect();
+  for (const item of steps.children) {
+    const from = (before.get(item) ?? bottom) - item.getBoundingClientRect().top;
+    item.animate({ translate: [`0 ${from}px`, '0 0'], opacity: [before.has(item) ? 1 : 0, 1] }, STEP_MOVE);
+  }
+}
+
 function showStep(step) {
   const item = document.createElement('li');
   item.dataset.step = step.id;
@@ -46,15 +65,16 @@ function showStep(step) {
     const label = (token) => KEY_LABELS[token] ?? token.replace(/^C-/, 'Ctrl-');
     item.append(folded('答えを見る', ...step.do.flatMap((token) => [code(label(token)), ' '])));
   }
-  $('steps').append(item);
-  $('steps').scrollTop = $('steps').scrollHeight;
+  moveSteps(() => $('steps').append(item));
   return item;
 }
 
 function markDone(item) {
-  item.removeAttribute('aria-current');
-  item.className = 'done';
-  item.querySelectorAll('details').forEach((details) => details.remove());
+  moveSteps(() => {
+    item.removeAttribute('aria-current');
+    item.className = 'done';
+    item.querySelectorAll('details').forEach((details) => details.remove());
+  });
 }
 
 let activeStep = null;
@@ -157,7 +177,8 @@ terminal.addEventListener('tmux-layout', drawHighlight);
 addEventListener('hashchange', play);
 $('restart').addEventListener('click', () => location.reload());
 // toggle は泡立たないので capture で受ける。開いたヒントが欄の外に隠れないようにする
-$('steps').addEventListener('toggle', () => ($('steps').scrollTop = $('steps').scrollHeight), true);
+$('steps').addEventListener('toggle', pinSteps, true);
+new ResizeObserver(pinSteps).observe($('steps')); // 欄の高さが変わっても、進行中のステップを下端に保つ
 $('lessons').addEventListener('change', (event) => {
   location.hash = event.target.value;
   terminal.focus();
@@ -180,13 +201,69 @@ addEventListener(
       return;
     }
     // 文字の選択などでどこにもフォーカスがないと、キー入力が消えてしまう。Cmd は選んだ文字のコピーなどに残す。
-    // このキーの配送先はもう決まっているので、端末へ送り直す。文字の入力は続く keypress が端末へ届く
+    // このキーの配送先はもう決まっているので、端末へ送り直す。文字の入力は続く keypress が端末へ届く。
+    // 端末を最小化したり消したりしているとフォーカスは移らず、body へ送り直すとこの処理に戻ってきてしまう
     if (document.activeElement === document.body && !event.metaKey) {
       terminal.focus();
-      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', event));
+      if (document.activeElement !== document.body) document.activeElement.dispatchEvent(new KeyboardEvent('keydown', event));
     }
   },
   true,
 );
+
+// ウィンドウの枠。赤は消す（再読み込みまで戻らない）、黄は最小化、緑はフルスクリーン
+const lessonWindow = $('lesson');
+const terminalWindow = $('terminal-window');
+const minimizeTerminal = terminalWindow.querySelector('.minimize');
+const maximizeTerminal = terminalWindow.querySelector('.maximize');
+
+for (const win of [lessonWindow, terminalWindow]) {
+  win.querySelector('.close').addEventListener('click', () => {
+    win.hidden = true; // 欄の中身は $() で参照し続けるので、DOM からは外さない
+    if (win !== terminalWindow) return;
+    terminal.remove(); // VM も破棄される
+    $('status').textContent = ENV_STOPPED_MESSAGE;
+    if (document.fullscreenElement) document.exitFullscreen();
+  });
+  const minimize = win.querySelector('.minimize');
+  minimize.addEventListener('click', () => minimize.setAttribute('aria-pressed', win.classList.toggle('minimized')));
+}
+
+maximizeTerminal.addEventListener('click', () => {
+  if (document.fullscreenElement) return document.exitFullscreen();
+  if (terminalWindow.classList.contains('minimized')) minimizeTerminal.click();
+  navigator.keyboard?.lock(['Escape']); // Esc をコピーモードで使えるようにする。対応ブラウザでは Esc の長押しで解除する
+  document.documentElement.requestFullscreen();
+});
+
+const fitTerminal = () => (document.fullscreenElement ? terminal.fit(terminal.clientWidth, terminal.clientHeight) : terminal.fit());
+addEventListener('resize', fitTerminal);
+document.addEventListener('fullscreenchange', () => {
+  const on = Boolean(document.fullscreenElement);
+  maximizeTerminal.setAttribute('aria-pressed', on);
+  minimizeTerminal.disabled = on;
+  if (!on) lessonWindow.removeAttribute('style'); // ドラッグした位置を捨てて元の場所へ戻す
+  fitTerminal();
+});
+
+// フルスクリーンの間だけ、欄をタイトルバーでドラッグできる。タイトルバーが画面の外へ出ないよう、画面内に収める
+const lessonBar = lessonWindow.querySelector('.titlebar');
+let grab;
+lessonBar.addEventListener('pointerdown', (event) => {
+  if (!document.fullscreenElement || event.target.closest('button')) return;
+  const { left, top } = lessonWindow.getBoundingClientRect();
+  grab = { x: event.clientX - left, y: event.clientY - top };
+  lessonBar.setPointerCapture(event.pointerId);
+});
+lessonBar.addEventListener('pointermove', (event) => {
+  if (!lessonBar.hasPointerCapture(event.pointerId)) return;
+  const within = (value, max) => `${Math.max(0, Math.min(value, max))}px`;
+  Object.assign(lessonWindow.style, {
+    left: within(event.clientX - grab.x, innerWidth - lessonWindow.offsetWidth),
+    top: within(event.clientY - grab.y, innerHeight - lessonWindow.offsetHeight),
+    right: 'auto',
+    translate: 'none',
+  });
+});
 
 play();

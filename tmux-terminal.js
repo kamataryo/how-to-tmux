@@ -8,6 +8,7 @@ import { Terminal } from './xterm/xterm.mjs';
 
 const COLS = 100; // vm/Dockerfile の stty と揃える
 const ROWS = 30;
+const FONT_SIZE = 14;
 const encoder = new TextEncoder();
 
 // 例: "layout 0 0 %0:0:0:50:29:1 %1:51:0:49:29:0"（ウィンドウ番号、ズーム中か、ペインごとの id:桁:行:幅:高さ:アクティブか）
@@ -52,7 +53,7 @@ class TmuxTerminal extends HTMLElement {
       cols: COLS,
       rows: ROWS,
       fontFamily: 'Menlo, Consolas, monospace',
-      fontSize: 14,
+      fontSize: FONT_SIZE,
       linkHandler: { activate() {} },
     });
     term.open(this);
@@ -126,7 +127,10 @@ class TmuxTerminal extends HTMLElement {
   disconnectedCallback() {
     this.#layout = null;
     for (const run of this.#runs.values()) run.reject(new Error('VM を破棄しました'));
-    this.#vm.destroy();
+    // 読み込み中の v86 は破棄できず、放っておくと読み込み後に動き出すので、起動を待って破棄する
+    const vm = this.#vm;
+    if (vm.is_running()) vm.destroy();
+    else vm.add_listener('emulator-started', () => vm.destroy());
     this.#term.dispose();
   }
 
@@ -148,6 +152,18 @@ class TmuxTerminal extends HTMLElement {
 
   focus() {
     this.#term?.focus();
+  }
+
+  /** 文字盤を width×height（px）に収まる文字の大きさにする。桁数と行数は変えない。引数なしで元の大きさへ戻す */
+  fit(width, height) {
+    if (!this.isConnected) return;
+    const { options, element } = this.#term;
+    if (!width) {
+      options.fontSize = FONT_SIZE;
+      return;
+    }
+    const screen = element.querySelector('.xterm-screen');
+    options.fontSize = Math.floor(options.fontSize * Math.min(width / screen.offsetWidth, height / screen.offsetHeight));
   }
 
   /** 最後に届いたペインの配置。起動直後の最初の通知までは null */

@@ -57,6 +57,7 @@ http://127.0.0.1:8000/ を開きます。`dist/site` のページとシナリオ
 | `highlight(col, row, width, height)` | メソッド | 画面に矩形を重ねて描き、その要素を返す |
 | `layout` | プロパティ | 最新のペインの配置。最初の通知までは `null` |
 | `focus()` | メソッド | キー入力を端末へ向ける |
+| `fit(width, height)` | メソッド | 文字盤が指定の大きさ（px）に収まるよう文字の大きさを変える。桁数と行数は変わらない。引数なしで元に戻す |
 | `run(command)` | メソッド | VM でシェルコマンドを実行し、終了コードの Promise を返す |
 | `tmux-layout` | イベント | ペインの配置が変わった。`detail` は `layout` と同じ形 |
 | `tmux-hook` | イベント | tmux の操作の通知。`detail` は `split-window` か `new-window` |

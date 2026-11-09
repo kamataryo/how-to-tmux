@@ -20,33 +20,146 @@
       }
       body {
         margin: 0;
-        background: #000;
+        background: #1a1c22;
         color: #d0d0d0;
         font: 15px/1.6 system-ui, sans-serif;
       }
       main {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(max-content, 1fr) minmax(320px, 1fr);
         gap: 16px;
+        place-items: center;
+        box-sizing: border-box;
+        min-height: 100dvh;
         padding: 16px;
-        align-items: flex-start;
       }
-      #lesson {
-        flex: 1 1 320px;
-        min-width: 0;
-        max-height: calc(100dvh - 32px);
+      .window {
         display: flex;
         flex-direction: column;
+        box-sizing: border-box;
+        max-width: 100%;
+        overflow: hidden;
+        border: 1px solid #4a4a4f;
+        border-radius: 10px;
+        background: #1e1e1e;
+        box-shadow: 0 18px 50px #000a;
+      }
+      .window[hidden] {
+        display: none;
+      }
+      #lesson.minimized {
+        height: auto;
+      }
+      /* 幅を保つので、最小化しても隣のウィンドウが動かない。visibility なので隠れた中身にフォーカスも移らない */
+      .window.minimized > :not(.titlebar) {
+        flex: none;
+        height: 0;
+        min-height: 0;
+        padding: 0;
+        overflow: hidden;
+        visibility: hidden;
+      }
+      .titlebar {
+        position: relative;
+        display: flex;
+        flex: none;
+        gap: 10px; /* ボタンの中心の間隔を、押しやすさの目安の 24px にする */
+        align-items: center;
+        height: 32px;
+        padding: 0 12px;
+        background: #2c2c2e;
+      }
+      .titlebar button {
+        z-index: 1;
+        width: 14px;
+        height: 14px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        color: transparent;
+        font: bold 11px/14px system-ui, sans-serif;
+        cursor: pointer;
+      }
+      .titlebar:hover button,
+      .titlebar button:focus-visible {
+        color: #000a;
+      }
+      .titlebar button:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+      }
+      .titlebar .close {
+        background: #ff5f57;
+      }
+      .titlebar .minimize {
+        background: #febc2e;
+      }
+      .titlebar .maximize {
+        background: #28c840;
+      }
+      .titlebar button:disabled {
+        background: #6a6a6f;
+        color: transparent;
+        cursor: default;
+      }
+      .title {
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        color: #c8c8c8;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 32px;
+        text-align: center;
+        pointer-events: none;
+        user-select: none;
+      }
+      #lesson {
+        grid-area: 1 / 2;
+        width: min(100%, 480px);
+        height: min(100dvh - 32px, 560px);
+      }
+      .window-body {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
         gap: 8px;
+        min-height: 0;
+        padding: 12px;
+      }
+      #terminal-window {
+        grid-area: 1 / 1;
+        background: #000;
       }
       tmux-terminal {
         display: block;
         overflow: auto;
-        flex: 0 0 auto;
-        max-width: 100%;
       }
-      h1 {
-        margin: 0;
-        font-size: 18px;
+      /* ページ全体をフルスクリーンにする。端末だけにすると、その外にある #lesson が描画されなくなる */
+      :fullscreen #terminal-window {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        border: 0;
+        border-radius: 0;
+      }
+      :fullscreen tmux-terminal {
+        display: grid;
+        flex: 1;
+        place-content: center;
+        min-height: 0;
+        overflow: hidden;
+      }
+      :fullscreen #lesson {
+        position: fixed;
+        top: 50%;
+        right: 16px;
+        z-index: 2;
+        translate: 0 -50%;
+      }
+      :fullscreen #lesson .titlebar {
+        cursor: move;
+        touch-action: none;
       }
       p {
         margin: 0;
@@ -64,17 +177,26 @@
         color: #a0a0a0;
         font-size: 13px;
       }
+      /* 進行中のステップを下端に揃える。上へはみ出した行は薄くなって消える（スクロールすれば読める） */
       #steps {
+        display: flex;
         flex: 1;
+        flex-direction: column;
         min-height: 0;
         overflow: auto;
         margin: 0;
         padding: 0;
         list-style: none;
+        scrollbar-width: none;
+        mask-image: linear-gradient(transparent, #000 min(32px, 20%));
+      }
+      #steps > :first-child {
+        margin-top: auto;
       }
       #steps li {
         padding: 6px 0 6px 12px;
         border-left: 3px solid transparent;
+        transition: color 0.5s, border-left-color 0.5s;
       }
       #steps li[aria-current] {
         border-left-color: #fc0;
@@ -114,6 +236,7 @@
         flex-wrap: wrap;
         align-items: center;
         gap: 12px;
+        min-height: 32px; /* #next の高さ。#next が消えても手順の欄の高さが変わらないようにする */
       }
       #next {
         padding: 2px 16px;
@@ -128,14 +251,18 @@
         font-size: 13px;
       }
       /* 端末は 100 桁で固定なので、欄を横に置けない幅では上に重ね、指示と端末が同時に見えるようにする */
-      @media (max-width: 1210px) {
+      @media (max-width: 1220px) {
         main {
-          flex-direction: column;
-          align-items: stretch;
+          grid-template-columns: minmax(0, 1fr);
+          align-content: center;
         }
         #lesson {
-          flex: none;
-          max-height: 40dvh;
+          grid-area: auto;
+          width: 100%;
+          height: 40dvh;
+        }
+        #terminal-window {
+          grid-area: auto;
         }
       }
     </style>
@@ -143,21 +270,35 @@
   </head>
   <body>
     <main>
-      <section id="lesson" aria-labelledby="course-title">
-        <h1 id="course-title"></h1>
-        <select id="lessons" aria-label="レッスン"></select>
-        <p id="goal"></p>
-        <progress id="progress" aria-label="ステップの進み具合"></progress>
-        <ol id="steps" aria-live="polite"></ol>
-        <p id="status" role="status"></p>
-        <p id="actions">
-          <button id="next" hidden>次へ</button>
-          <a id="next-lesson" hidden>次のレッスンへ</a>
-          <button id="restart">このレッスンをやり直す</button>
-        </p>
-        <p id="note"><kbd>F6</kbd> で端末とこの欄を行き来できます。</p>
+      <section id="lesson" class="window" aria-labelledby="course-title">
+        <header class="titlebar">
+          <button class="close" aria-label="レッスンの欄を閉じる" title="閉じる">×</button>
+          <button class="minimize" aria-label="レッスンの欄を最小化" aria-pressed="false" title="最小化">−</button>
+          <h1 id="course-title" class="title"></h1>
+        </header>
+        <div class="window-body">
+          <select id="lessons" aria-label="レッスン"></select>
+          <p id="goal"></p>
+          <progress id="progress" aria-label="ステップの進み具合"></progress>
+          <ol id="steps" aria-live="polite"></ol>
+          <p id="status" role="status"></p>
+          <p id="actions">
+            <button id="next" hidden>次へ</button>
+            <a id="next-lesson" hidden>次のレッスンへ</a>
+            <button id="restart">このレッスンをやり直す</button>
+          </p>
+          <p id="note"><kbd>F6</kbd> で端末とこの欄を行き来できます。</p>
+        </div>
       </section>
-      <tmux-terminal></tmux-terminal>
+      <section id="terminal-window" class="window" aria-labelledby="terminal-title">
+        <header class="titlebar">
+          <button class="close" aria-label="端末を閉じる" title="閉じる">×</button>
+          <button class="minimize" aria-label="端末を最小化" aria-pressed="false" title="最小化">−</button>
+          <button class="maximize" aria-label="端末をフルスクリーンにする" aria-pressed="false" title="フルスクリーン">+</button>
+          <h2 id="terminal-title" class="title">端末</h2>
+        </header>
+        <tmux-terminal></tmux-terminal>
+      </section>
     </main>
   </body>
 </html>

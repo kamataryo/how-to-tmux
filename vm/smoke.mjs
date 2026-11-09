@@ -17,7 +17,7 @@ assert.ok(existsSync(path.join(site, 'images/state.bin.zst')), `${site} に配�
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const server = spawn('python3', ['-I', '-m', 'http.server', String(PORT), '--bind', '127.0.0.1', '-d', site], { stdio: 'ignore' });
 const profile = mkdtempSync(path.join(tmpdir(), 'tmux-forcage-smoke-'));
-const chrome = spawn(chromePath, ['--headless=new', `--user-data-dir=${profile}`, '--remote-debugging-port=0', '--no-first-run', '--no-default-browser-check', '--disable-extensions', 'about:blank'], { stdio: 'ignore' });
+const chrome = spawn(chromePath, ['--headless=new', `--user-data-dir=${profile}`, '--remote-debugging-port=0', '--window-size=1440,900', '--screen-info={1440x900}', '--no-first-run', '--no-default-browser-check', '--disable-extensions', 'about:blank'], { stdio: 'ignore' });
 
 async function waitUntil(what, check, timeout = 30_000) {
   const started = Date.now();
@@ -169,6 +169,12 @@ try {
   };
   const walkStep = async (where, step) => {
     await waitUntil(`${where} の表示`, async () => (await currentStep()) === step.id);
+    // 進行中のステップは欄の下端にある。手順が欄からはみ出す長さになっても同じ
+    const gap = await evaluate(`Promise.allSettled(document.getElementById('steps').getAnimations({ subtree: true }).map((animation) => animation.finished)).then(() => {
+      const steps = document.getElementById('steps');
+      return steps.getBoundingClientRect().bottom - steps.querySelector('[aria-current]').getBoundingClientRect().bottom;
+    })`);
+    assert.ok(Math.abs(gap) < 1, `${where}: 進行中のステップが下端にありません: ${gap}`);
     assert.equal(await evaluate(`document.querySelector('.tmux-highlights').childElementCount`), step.highlight ? 1 : 0, `${where}: ハイライトの数が違います`);
     if (step.check) assert.notEqual(await run(step.check), 0, `${where}: do の前から合格しています`);
     for (const [index, token] of (step.do ?? []).entries()) {
@@ -196,6 +202,24 @@ try {
     assert.equal(await currentStep(), lesson.steps[0].id, `${lesson.where}: 最初のステップが飛ばされました`);
   }
 
+  // ステップを終えると、前の行は今の位置から動き出し、次の行は欄の下から透明な状態で現れる（最初のレッスンの最初のステップは「次へ」で進む）
+  const stepMove = await evaluate(`(async () => {
+    const steps = document.getElementById('steps');
+    const doneTop = steps.firstElementChild.getBoundingClientRect().top;
+    document.getElementById('next').click();
+    await new Promise((resolve) => setTimeout(resolve));
+    const moves = steps.getAnimations({ subtree: true }).filter((animation) => !(animation instanceof CSSTransition));
+    moves.forEach((animation) => { animation.pause(); animation.currentTime = 0; });
+    const [done, next] = steps.children;
+    const start = { moves: moves.length, doneMoved: done.getBoundingClientRect().top - doneTop, nextBelow: next.getBoundingClientRect().top - steps.getBoundingClientRect().bottom, nextOpacity: getComputedStyle(next).opacity };
+    moves.forEach((animation) => animation.finish());
+    return start;
+  })()`);
+  assert.equal(stepMove.moves, 2, 'ステップの行が動いていません');
+  assert.ok(Math.abs(stepMove.doneMoved) < 1, `終えたステップが動き出す前に飛びました: ${stepMove.doneMoved}`);
+  assert.ok(Math.abs(stepMove.nextBelow) < 1, `次のステップが欄の下から現れません: ${stepMove.nextBelow}`);
+  assert.equal(stepMove.nextOpacity, '0');
+
   // デタッチ中にレッスンを移ると、端末を戻せないので VM を作り直してから始める
   const second = lessons[1];
   await run('tmux detach-client');
@@ -221,6 +245,110 @@ try {
   await waitUntil('環境の停止の表示', async () => (await status()).includes('やり直す'));
   await run('tmux new -d -s lesson');
   await waitUntil('環境の復帰の表示', async () => (await status()) === '');
+
+  // ウィンドウの枠。フルスクリーンにはユーザー操作が要るので、本物のマウス操作で押す
+  const rectOf = (selector) => evaluate(`(() => { const { left, top, width, height } = document.querySelector('${selector}').getBoundingClientRect(); return { left, top, width, height }; })()`);
+  const mouse = (type, x, y, buttons = 1) => page('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons, clickCount: 1 });
+  const clickOn = async (selector) => {
+    const { left, top, width, height } = await rectOf(selector);
+    const [x, y] = [left + width / 2, top + height / 2];
+    await mouse('mousePressed', x, y);
+    await mouse('mouseReleased', x, y, 0);
+  };
+  const terminalWindow = '#terminal-window';
+  const fontSize = () => evaluate(`parseFloat(getComputedStyle(document.querySelector('.xterm-rows')).fontSize)`);
+  const screenSize = () => rectOf('.xterm-screen');
+
+  // 通常時は端末が左、欄が右で、どちらも上下の中央にある
+  const [terminalRect, lessonRect, viewportHeight] = [await rectOf(terminalWindow), await rectOf('#lesson'), await evaluate(`innerHeight`)];
+  assert.ok(terminalRect.left + terminalRect.width <= lessonRect.left, '端末が欄の左にありません');
+  for (const { top, height } of [terminalRect, lessonRect]) assert.ok(Math.abs(top + height / 2 - viewportHeight / 2) < 1, '上下の中央にありません');
+
+  // 最小化しても VM は動き続け、最小化中のキー入力でエラーにならない
+  const normalSize = await screenSize();
+  await clickOn(`${terminalWindow} .minimize`);
+  assert.equal((await rectOf(terminalWindow)).height, (await rectOf(`${terminalWindow} .titlebar`)).height + 2, '最小化できません');
+  await evaluate(`document.activeElement.blur()`); // 余白をクリックした後と同じ。フォーカスを戻せないときにキー入力の転送が再帰しない
+  await press('a', 'KeyA', 65, 0, 'a');
+  await clickOn(`${terminalWindow} .minimize`);
+  const restoredSize = await screenSize();
+  assert.deepEqual([restoredSize.width, restoredSize.height], [normalSize.width, normalSize.height], '最小化から戻すと大きさが変わりました');
+  assert.ok(await evaluate(`tmux.contains(document.activeElement)`), '最小化から戻すと端末にフォーカスがありません');
+  assert.equal(await run('true'), 0);
+
+  // フルスクリーンでは文字盤が画面いっぱいに広がり、欄は常に前面でドラッグできる。桁数と行数は変わらない
+  const rowsBefore = await evaluate(`document.querySelectorAll('.xterm-rows > div').length`);
+  await clickOn(`${terminalWindow} .maximize`);
+  await waitUntil('フルスクリーン', () => evaluate(`!!document.fullscreenElement`));
+  await waitUntil('文字の拡大', async () => (await fontSize()) > 14);
+  const { innerWidth, innerHeight } = await evaluate(`({ innerWidth, innerHeight })`);
+  const titlebarHeight = (await rectOf(`${terminalWindow} .titlebar`)).height;
+  const fitted = await screenSize();
+  assert.ok(fitted.left >= 0 && fitted.left + fitted.width <= innerWidth && fitted.top >= titlebarHeight && fitted.top + fitted.height <= innerHeight, `文字盤が画面に収まっていません: ${JSON.stringify(fitted)}`);
+  // 文字を 1px 大きくすると、幅は 60px ほど、高さは 34px ほど増える
+  assert.ok(innerWidth - fitted.width < 70 || innerHeight - titlebarHeight - fitted.height < 40, `文字盤が画面を埋めていません: ${JSON.stringify(fitted)}`);
+  assert.equal(await evaluate(`document.querySelectorAll('.xterm-rows > div').length`), rowsBefore);
+  assert.ok(await evaluate(`document.querySelector('${terminalWindow} .minimize').disabled`), 'フルスクリーン中は最小化できません');
+  const inFront = () => evaluate(`(() => { const { left, top, width, height } = document.getElementById('lesson').getBoundingClientRect(); return !!document.elementFromPoint(left + width / 2, top + height / 2).closest('#lesson'); })()`);
+  assert.ok(await inFront(), '欄が端末の前面にありません');
+  const dragBar = async (dx, dy) => {
+    const { left, top, width } = await rectOf('#lesson .titlebar');
+    const [x, y] = [left + width / 2, top + 16];
+    await mouse('mousePressed', x, y);
+    await mouse('mouseMoved', x + dx, y + dy);
+    await mouse('mouseReleased', x + dx, y + dy, 0);
+  };
+  const lessonBefore = await rectOf('#lesson');
+  await dragBar(-120, -40);
+  const moved = await rectOf('#lesson');
+  assert.ok(Math.abs(moved.left - (lessonBefore.left - 120)) < 1 && Math.abs(moved.top - Math.max(0, lessonBefore.top - 40)) < 1, `ドラッグで動きません: ${JSON.stringify(moved)}`);
+  assert.ok(await inFront(), 'ドラッグの後に欄が前面にありません');
+  await dragBar(-5000, -5000);
+  const clamped = await rectOf('#lesson');
+  assert.deepEqual([clamped.left, clamped.top], [0, 0], '画面の外へ出ました');
+
+  // 緑でもう一度押すと元に戻る（左上へ動かした欄が緑のボタンに重なっているので、先にどかす）
+  await dragBar(400, 100);
+  await clickOn(`${terminalWindow} .maximize`);
+  await waitUntil('フルスクリーンの解除', () => evaluate(`!document.fullscreenElement`));
+  await waitUntil('文字の大きさの復帰', async () => (await fontSize()) === 14);
+  const lessonRestored = await rectOf('#lesson');
+  assert.deepEqual([lessonRestored.left, lessonRestored.top], [lessonRect.left, lessonRect.top], 'ドラッグした位置が残っています');
+
+  // 欄を消してもレッスンは進み続ける
+  await clickOn('#lesson .minimize');
+  assert.equal((await rectOf('#lesson')).height, (await rectOf('#lesson .titlebar')).height + 2, '欄を最小化できません');
+  await clickOn('#lesson .minimize');
+  await clickOn('#lesson .close');
+  assert.equal(await evaluate(`getComputedStyle(document.getElementById('lesson')).display`), 'none');
+  assert.equal(await run('true'), 0);
+
+  // 端末を消すと VM も止まり、キー入力やクリックでエラーにならない
+  const busyRatio = async () => {
+    const taskDuration = async () => (await page('Performance.getMetrics')).metrics.find(({ name }) => name === 'TaskDuration').value;
+    const [startedTask, startedAt] = [await taskDuration(), performance.now()];
+    await sleep(2000);
+    return (await taskDuration() - startedTask) / ((performance.now() - startedAt) / 1000);
+  };
+  await page('Performance.enable');
+  const busyBefore = await busyRatio();
+  await clickOn(`${terminalWindow} .close`);
+  assert.equal(await evaluate(`!!document.querySelector('tmux-terminal')`), false);
+  assert.equal(await evaluate(`getComputedStyle(document.getElementById('terminal-window')).display`), 'none');
+  assert.ok((await status()).includes('やり直す'));
+  await evaluate(`document.activeElement.blur()`); // 余白をクリックした後と同じ。フォーカスを戻せないときにキー入力の転送が再帰しない
+  await press('a', 'KeyA', 65, 0, 'a');
+  await evaluate(`document.body.click()`);
+  const busyAfter = await busyRatio();
+  assert.ok(busyAfter < busyBefore / 2, `端末を消しても VM が止まっていません: ${busyBefore} → ${busyAfter}`);
+
+  // 読み込み中に消しても例外にならず、読み込み後に VM が動き出さない
+  await page('Page.reload');
+  await waitUntil('読み込みの開始', () => evaluate(`!!document.querySelector('tmux-terminal progress')`).catch(() => false));
+  await clickOn(`${terminalWindow} .close`);
+  await sleep(8000); // 状態ファイルの読み込みと起動が終わるのを待つ
+  const busyLoaded = await busyRatio();
+  assert.ok(busyLoaded < busyBefore / 2, `読み込み中に消しても VM が動き出しました: ${busyBefore} → ${busyLoaded}`);
 
   assert.deepEqual(problems, [], 'コンソールにエラーがあります（CSP 違反を含む）');
   const external = requested.filter((url) => !url.startsWith(`${origin}/`) && !url.startsWith('blob:') && !url.startsWith('data:'));
