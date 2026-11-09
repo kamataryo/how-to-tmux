@@ -22,7 +22,7 @@ import tmux from './tmux.js';
 
 export default {
   id: 'linux',
-  title: 'How to tmux講座',
+  title: 'How to tmux',
   setup: RESET,
   alive: ALIVE,
   modules: [tmux],

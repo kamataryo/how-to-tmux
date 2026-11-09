@@ -8,10 +8,10 @@ Docker、Node.js、zstd、Python 3 が必要です。
 
 ```sh
 vm/build.sh  # dist/site に配信物を作る（2 分ほど）
-python3 -m http.server 8000 --bind 127.0.0.1 -d dist/site
+python3 vm/serve.py
 ```
 
-http://127.0.0.1:8000/ を開きます。VM に関わらないページとシナリオだけを変えたときは、`cp index.html tmux-terminal.js lesson-player.js dist/site/ && cp -R courses dist/site/` で反映できます。
+http://127.0.0.1:8000/ を開きます。`dist/site` のページとシナリオはソースへのシンボリックリンクなので、編集して再読み込みすれば反映されます（`python3 -m http.server` で配信すると、JS が古いキャッシュのまま読まれることがあります）。`vm/build.sh` を実行し直すのは、`vm/Dockerfile`、`vm/make-state.mjs`、v86 や xterm.js の版を変えたときだけです。
 
 テストは `pnpm test` です。`dist/site` をヘッドレス Chrome で開き、tmux の操作、ハイライト、配置の通知、`run()`、CSP を確かめたうえで、シナリオの全レッスンを画面から通します（1 分ほど）。Chrome の場所が違うときは環境変数 `CHROME` で指定します。
 
@@ -144,7 +144,7 @@ const code = await terminal.run('[ $(tmux list-panes | wc -l) -eq 2 ]');
 
 ## レッスンを書くときの注意
 
-- **スクリプトは別ファイルにする:** CSP によりインラインスクリプトは動きません。同一オリジンの `.js` ファイルにして、`vm/build.sh` の最後の `cp` に追加してください。
+- **スクリプトは別ファイルにする:** CSP によりインラインスクリプトは動きません。同一オリジンの `.js` ファイルにして、`vm/build.sh` の最後の `ln -s` に追加してください。
 - **VM からの値を信頼しない:** 利用者は VM の root なので、`echo 'layout …' >/dev/ttyS1` などで通知を偽装できます。`detail` を `innerHTML` に入れず、合否の判定を権限や認定に使わないでください。形式の合わない `layout` の行は捨てられます。
 - **VM の時計は保存時刻のまま:** ビルド時の状態を復元するので、VM の中の時刻は正しくありません。ステータスバーの時刻は消してあります。
 
@@ -159,11 +159,13 @@ const code = await terminal.run('[ $(tmux list-panes | wc -l) -eq 2 ]');
 | `vm/Dockerfile` | VM のイメージ、`run()` の窓口（`lesson-agent`）、`.tmux.conf`。**設定エラーがあると tmux はエラー表示で起動する** |
 | `vm/build.sh` | 配信物のビルド。v86 と xterm.js の版もここで固定している |
 | `vm/make-state.mjs` | VM を起動し、tmux が動いている状態を保存する。ページはここから復元する |
+| `vm/serve.py` | 開発用の配信。ブラウザに毎回更新を確かめさせる |
 | `vm/smoke.mjs` | `pnpm test` の中身 |
 
 `tmux-layout` の行の形式を変えるときは、`vm/Dockerfile` の `NOTIFY_LAYOUT` と `tmux-terminal.js` の `PANE` を揃えて変更します。
 
 ## 公開する前に
 
+- `dist/site` のページとシナリオはシンボリックリンクなので、`cp -RL dist/site <公開先>` で実体にしてから公開してください。
 - Linux カーネルや BusyBox を配布することになるので、GPL への対応（ソースの提供など）が必要です。
 - `<ユーザー>.github.io` は配下のプロジェクトでオリジンを共有します。`localStorage` などを使うなら、専用のドメインで公開してください。
