@@ -15,6 +15,10 @@ const encoder = new TextEncoder();
 const PANE = String.raw`%\d+:\d+:\d+:\d+:\d+:[01]`;
 const LAYOUT_LINE = new RegExp(`^layout (\\d+) ([01]) (${PANE}(?: ${PANE})*)$`);
 
+// vm/Dockerfile の lesson-agent と揃える。lesson-agent はコマンドを 10 秒で打ち切るので、それより少し長く待つ
+const RUN_RESULT = /^run (\d+) (\d+)$/;
+const RUN_TIMEOUT = 15_000;
+
 function parseLayout(line) {
   const match = LAYOUT_LINE.exec(line);
   if (!match) return null;
@@ -34,9 +38,10 @@ class TmuxTerminal extends HTMLElement {
   #term;
   #overlay;
   #layout = null;
+  #runs = new Map();
+  #lastRun = 0;
 
   connectedCallback() {
-    this.#layout = null;
     const progress = document.createElement('progress');
     progress.setAttribute('aria-label', '環境を読み込み中');
     progress.style.width = '100%';
@@ -56,6 +61,7 @@ class TmuxTerminal extends HTMLElement {
     // highlight() の置き場。文字盤と同じ大きさなので、位置を % で指定すればスクロールしてもずれない。
     // 座標は VM から偽装できるが、はみ出した分は overflow で切れる
     this.#overlay = document.createElement('div');
+    this.#overlay.className = 'tmux-highlights';
     this.#overlay.setAttribute('aria-hidden', 'true');
     Object.assign(this.#overlay.style, { position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 10 });
     term.element.querySelector('.xterm-screen').append(this.#overlay);
@@ -118,11 +124,18 @@ class TmuxTerminal extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this.#layout = null;
+    for (const run of this.#runs.values()) run.reject(new Error('VM を破棄しました'));
     this.#vm.destroy();
     this.#term.dispose();
   }
 
   #onVmLine(line) {
+    if (line.startsWith('run ')) {
+      const [, id, code] = RUN_RESULT.exec(line) ?? [];
+      this.#runs.get(Number(id))?.resolve(Number(code));
+      return;
+    }
     if (!line.startsWith('layout ')) {
       this.dispatchEvent(new CustomEvent('tmux-hook', { bubbles: true, detail: line }));
       return;
@@ -140,6 +153,23 @@ class TmuxTerminal extends HTMLElement {
   /** 最後に届いたペインの配置。起動直後の最初の通知までは null */
   get layout() {
     return this.#layout;
+  }
+
+  /** VM でシェルコマンドを 1 行実行し、終了コードを返す。出力は捨てる。結果は利用者が偽装できる */
+  async run(command) {
+    if (!this.#layout) throw new Error('VM の起動前です');
+    if (command.includes('\n')) throw new TypeError('コマンドは 1 行にしてください');
+    const id = ++this.#lastRun;
+    const run = Promise.withResolvers();
+    this.#runs.set(id, run);
+    const timer = setTimeout(() => run.reject(new Error(`応答がありません: ${command}`)), RUN_TIMEOUT);
+    this.#vm.serial_send_bytes(1, encoder.encode(`${id} ${command}\n`));
+    try {
+      return await run.promise;
+    } finally {
+      clearTimeout(timer);
+      this.#runs.delete(id);
+    }
   }
 
   /** 文字盤の桁・行（0 始まり）で矩形を重ねて描く。返り値は普通の要素で、remove() で消せる */

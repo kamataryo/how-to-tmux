@@ -11,22 +11,153 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src blob:; base-uri 'none'; form-action 'none'"
     />
-    <title>tmux 促成講座</title>
+    <title>Linux 促成講座</title>
     <link rel="stylesheet" href="./xterm/xterm.css" />
     <style>
+      :root {
+        color-scheme: dark;
+        accent-color: #fc0;
+      }
       body {
         margin: 0;
         background: #000;
         color: #d0d0d0;
+        font: 15px/1.6 system-ui, sans-serif;
+      }
+      main {
+        display: flex;
+        gap: 16px;
+        padding: 16px;
+        align-items: flex-start;
+      }
+      #lesson {
+        flex: 1 1 320px;
+        min-width: 0;
+        max-height: calc(100dvh - 32px);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
       }
       tmux-terminal {
         display: block;
         overflow: auto;
+        flex: 0 0 auto;
+        max-width: 100%;
+      }
+      h1 {
+        margin: 0;
+        font-size: 18px;
+      }
+      p {
+        margin: 0;
+      }
+      select,
+      progress {
+        width: 100%;
+      }
+      select,
+      button {
+        font: inherit;
+      }
+      #goal,
+      #note {
+        color: #a0a0a0;
+        font-size: 13px;
+      }
+      #steps {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      #steps li {
+        padding: 6px 0 6px 12px;
+        border-left: 3px solid transparent;
+      }
+      #steps li[aria-current] {
+        border-left-color: #fc0;
+      }
+      #steps li.done {
+        color: #a0a0a0;
+        font-size: 13px;
+      }
+      #steps li.done p::before {
+        content: '✓ ';
+        color: #6c6;
+      }
+      details {
+        margin-top: 4px;
+        font-size: 13px;
+      }
+      summary {
+        cursor: pointer;
+        color: #a0a0a0;
+      }
+      code,
+      kbd {
+        padding: 0 4px;
+        border-radius: 3px;
+        background: #2a2a2a;
+        color: #ffd866;
+        font: 0.95em Menlo, Consolas, monospace;
+      }
+      #status {
+        color: #fc0;
+      }
+      #status:empty {
+        display: none;
+      }
+      #actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+      }
+      #next {
+        padding: 2px 16px;
+        font-weight: bold;
+      }
+      #next-lesson {
+        color: #fc0;
+        font-weight: bold;
+      }
+      #restart {
+        margin-left: auto;
+        font-size: 13px;
+      }
+      /* 端末は 100 桁で固定なので、欄を横に置けない幅では上に重ね、指示と端末が同時に見えるようにする */
+      @media (max-width: 1210px) {
+        main {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        #lesson {
+          flex: none;
+          max-height: 40dvh;
+        }
       }
     </style>
-    <script type="module" src="./tmux-terminal.js"></script>
+    <script type="module" src="./lesson-player.js"></script>
   </head>
   <body>
-    <tmux-terminal></tmux-terminal>
+    <main>
+      <section id="lesson" aria-labelledby="course-title">
+        <h1 id="course-title"></h1>
+        <select id="lessons" aria-label="レッスン"></select>
+        <p id="goal"></p>
+        <progress id="progress" aria-label="ステップの進み具合"></progress>
+        <ol id="steps" aria-live="polite"></ol>
+        <p id="status" role="status"></p>
+        <p id="actions">
+          <button id="next" hidden>次へ</button>
+          <a id="next-lesson" hidden>次のレッスンへ</a>
+          <button id="restart">このレッスンをやり直す</button>
+        </p>
+        <p id="note"><kbd>F6</kbd> で端末とこの欄を行き来できます。</p>
+      </section>
+      <tmux-terminal></tmux-terminal>
+    </main>
   </body>
 </html>

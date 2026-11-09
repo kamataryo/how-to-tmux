@@ -10,6 +10,21 @@ RUN sed -i '/^tty[0-9]/d' /etc/inittab
 RUN echo 'ttyS0::respawn:/sbin/agetty --autologin root -s ttyS0 115200 xterm-256color' >> /etc/inittab
 RUN echo "root:" | chpasswd
 
+# ページからの依頼でコマンドを実行する窓口（tmux-terminal.js の run()）。
+# /dev/ttyS1 から「番号 コマンド」の行を受け取り、順に実行して「run 番号 終了コード」を返す。
+# init の環境は HOME=/ なので、ペインと揃える。応答の形式を変えたら tmux-terminal.js の RUN_RESULT も直すこと
+RUN echo 'ttyS1::respawn:/usr/local/bin/lesson-agent' >> /etc/inittab
+COPY --chmod=755 <<'EOF' /usr/local/bin/lesson-agent
+#!/bin/sh
+export HOME=/root LANG=C.UTF-8
+cd
+stty raw -echo
+while read -r id cmd; do
+  timeout 10 sh -c "$cmd" </dev/null >/dev/null 2>&1
+  echo "run $id $?"
+done
+EOF
+
 # シリアルは端末サイズを伝えないので固定する。tmux-terminal.js の xterm.js と同じ値にすること。
 # tmux の各ペインもログインシェルで起動するので、ペインの大きさを壊さないようシリアルのときだけ実行する。
 # /etc/hostname は docker export で上書きされるので、ホスト名もここで設定する

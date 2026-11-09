@@ -44,5 +44,6 @@ docker run --rm -v "$WORK:/work" -v "$SITE/images:/images" python:3.14-alpine sh
 ' 2>&1 | tail -3
 
 node "$HERE/make-state.mjs" "$SITE" "$WORK/fs.json"
-cp "$ROOT/index.html" "$ROOT/tmux-terminal.js" "$SITE/"
+cp "$ROOT/index.html" "$ROOT/tmux-terminal.js" "$ROOT/lesson-player.js" "$SITE/"
+cp -R "$ROOT/courses" "$SITE/"
 echo "完了: $SITE"

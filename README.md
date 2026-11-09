@@ -1,6 +1,6 @@
 # tmux 促成講座
 
-ブラウザで動く tmux ショートカットの講座です。ブラウザ内の Linux VM（[v86](https://github.com/copy/v86)）で本物の tmux 3.5a を動かし、[xterm.js](https://github.com/xtermjs/xterm.js) で表示します。サーバー側の処理はなく、静的ファイルの配信だけで動きます。
+ブラウザで動く Linux の講座で、今は tmux のショートカットを学ぶモジュールがあります。ブラウザ内の Linux VM（[v86](https://github.com/copy/v86)）で本物の tmux 3.5a を動かし、[xterm.js](https://github.com/xtermjs/xterm.js) で表示します。サーバー側の処理はなく、静的ファイルの配信だけで動きます。
 
 ## 動かす
 
@@ -11,9 +11,37 @@ vm/build.sh  # dist/site に配信物を作る（2 分ほど）
 python3 -m http.server 8000 --bind 127.0.0.1 -d dist/site
 ```
 
-http://127.0.0.1:8000/ を開きます。`index.html` と `tmux-terminal.js` だけを変えたときは、`cp index.html tmux-terminal.js dist/site/` で反映できます。
+http://127.0.0.1:8000/ を開きます。VM に関わらないページとシナリオだけを変えたときは、`cp index.html tmux-terminal.js lesson-player.js dist/site/ && cp -R courses dist/site/` で反映できます。
 
-テストは `pnpm test` です。`dist/site` をヘッドレス Chrome で開き、tmux の操作、ハイライト、配置の通知、CSP を確かめます。Chrome の場所が違うときは環境変数 `CHROME` で指定します。
+テストは `pnpm test` です。`dist/site` をヘッドレス Chrome で開き、tmux の操作、ハイライト、配置の通知、`run()`、CSP を確かめたうえで、シナリオの全レッスンを画面から通します（1 分ほど）。Chrome の場所が違うときは環境変数 `CHROME` で指定します。
+
+## シナリオを書く
+
+シナリオは `courses/<コース>/` にあり、形は `courses/linux/index.js` の先頭に書いてあります。`lesson-player.js` はシナリオの中身を知らず、`setup` と `check` を VM で実行して、終了コードだけを見て進めます。
+
+新しいモジュールは `courses/linux/<名前>.js` に書き、`index.js` の `modules` に加えます。ステップのデータだけを書けば、次のものは共通の仕組みが受け持ちます。
+
+| 共通の仕組み | 場所 |
+|---|---|
+| レッスン開始時の初期化と、できないときの VM の作り直し | `courses/linux/index.js` の `setup` |
+| 環境が止まったときの表示 | `courses/linux/index.js` の `alive` |
+| 判定の部品（`onScreen()`、`running()` など） | `courses/linux/common.js` |
+| 全ステップの自動テスト | `pnpm test`（`do` を打って通す） |
+
+```js
+{
+  id: 'split-right',
+  say: '`Ctrl-b` のあと `%` で左右に分けます。',  // 指示
+  do: ['C-b', '%'],                               // 正解の操作
+  check: '[ $(tmux list-panes | wc -l) -eq 2 ]',  // 合格の条件
+}
+```
+
+- **状態が変わらないコマンドの判定:** `ls` などは `onScreen()` で画面の内容を見ます。
+- **`do` を必ず書く:** `pnpm test` が `do` を打って全ステップを通します。`check` が `do` を打ち終える前に成功するステップは失敗にします。指示を読み終える前に進んでしまうためです。
+- **`check` は間違えた後でも正解できるように書く:** 操作の回数やペインの数ではなく、目的の状態を判定します。回数に頼ると、やり直しても合格できなくなります。
+- **`setup` はやり直せるように書く:** 0 以外で終わると、ページを再読み込みして VM を作り直してからもう一度実行します。
+- **ブラウザと OS に奪われるキーを教えない:** `Ctrl-w` はタブを閉じ、`Ctrl-Space` は macOS の入力切替と衝突し、Option は xterm.js の既定では Meta になりません。
 
 ## `<tmux-terminal>` の使い方
 
@@ -29,6 +57,7 @@ http://127.0.0.1:8000/ を開きます。`index.html` と `tmux-terminal.js` だ
 | `highlight(col, row, width, height)` | メソッド | 画面に矩形を重ねて描き、その要素を返す |
 | `layout` | プロパティ | 最新のペインの配置。最初の通知までは `null` |
 | `focus()` | メソッド | キー入力を端末へ向ける |
+| `run(command)` | メソッド | VM でシェルコマンドを実行し、終了コードの Promise を返す |
 | `tmux-layout` | イベント | ペインの配置が変わった。`detail` は `layout` と同じ形 |
 | `tmux-hook` | イベント | tmux の操作の通知。`detail` は `split-window` か `new-window` |
 
@@ -84,6 +113,7 @@ terminal.addEventListener('tmux-layout', (event) => follow(event.detail));
 
 - 1 回の操作で複数回通知することがあります。最後の通知が最新の配置です。
 - `zoomed` が `true` のあいだ、正しい位置にあるのはアクティブなペインだけです。ほかのペインの値はズーム前のものです。
+- `move-window` と `swap-window` でウィンドウの番号が変わっても通知しません（tmux に対応するフックがありません）。その後に `tmux refresh-client` を実行すると通知します。
 
 ### キー入力を先に受け取る
 
@@ -97,6 +127,21 @@ addEventListener('keydown', (event) => {
 
 `event.preventDefault()` と `event.stopPropagation()` を呼ぶと、そのキーは VM に届きません。
 
+### VM でコマンドを実行する
+
+レッスンの準備や合否の判定に使います。画面には何も出ません。
+
+```js
+// 2 分割されていれば 0
+const code = await terminal.run('[ $(tmux list-panes | wc -l) -eq 2 ]');
+```
+
+- `layout` が `null` のあいだは VM の起動前なので、呼ぶと reject します。
+- root として `/root` で実行します。標準入力は空で、出力は捨てられます。
+- コマンドは 1 行だけで、複数を同時に呼ぶと順番に実行します。
+- 10 秒で打ち切り、終了コードは 143 になります。
+- 応答が 15 秒ないときや要素を外したときは reject します。利用者が VM の中で `lesson-agent` を止めても init が再起動するので、その後の呼び出しから復帰します。
+
 ## レッスンを書くときの注意
 
 - **スクリプトは別ファイルにする:** CSP によりインラインスクリプトは動きません。同一オリジンの `.js` ファイルにして、`vm/build.sh` の最後の `cp` に追加してください。
@@ -108,8 +153,10 @@ addEventListener('keydown', (event) => {
 | ファイル | 役割 |
 |---|---|
 | `index.html` | ページ本体と CSP |
+| `lesson-player.js` | シナリオを読み込み、レッスンを進める |
+| `courses/` | シナリオと、モジュール共通の部品 |
 | `tmux-terminal.js` | `<tmux-terminal>` 要素 |
-| `vm/Dockerfile` | VM のイメージと `.tmux.conf`。**設定エラーがあると tmux はエラー表示で起動する** |
+| `vm/Dockerfile` | VM のイメージ、`run()` の窓口（`lesson-agent`）、`.tmux.conf`。**設定エラーがあると tmux はエラー表示で起動する** |
 | `vm/build.sh` | 配信物のビルド。v86 と xterm.js の版もここで固定している |
 | `vm/make-state.mjs` | VM を起動し、tmux が動いている状態を保存する。ページはここから復元する |
 | `vm/smoke.mjs` | `pnpm test` の中身 |
