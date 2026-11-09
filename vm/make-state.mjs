@@ -19,7 +19,8 @@ const emulator = new V86({
   vga_memory_size: 2 * 1024 * 1024,
   uart1: true,
   bzimage_initrd_from_filesystem: true,
-  cmdline: 'rw root=host9p rootfstype=9p rootflags=trans=virtio,cache=loose modules=virtio_pci tsc=reliable init_on_free=on',
+  // ignoreqv: v86 のファイルは qid.version が 0 で、Linux はそれをキャッシュしない印として扱う。付けないとコマンドを起動するたびに HTTP で取り直す
+  cmdline: 'rw root=host9p rootfstype=9p rootflags=trans=virtio,cache=loose,ignoreqv modules=virtio_pci tsc=reliable init_on_free=on',
   filesystem: {
     baseurl: path.join(site, 'images/rootfs-flat'),
     basefs: fsJson,
