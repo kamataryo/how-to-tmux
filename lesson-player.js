@@ -236,6 +236,14 @@ maximizeTerminal.addEventListener('click', () => {
   document.documentElement.requestFullscreen();
 });
 
+// ライセンスは端末の less で開く。できないときは新しいタブで開く（VM の起動前や端末を消した後は run() が reject する）
+$('license').addEventListener('click', async (event) => {
+  event.preventDefault();
+  if (terminalWindow.classList.contains('minimized')) minimizeTerminal.click();
+  const code = await terminal.run(course.license).catch(() => null);
+  if (code !== 0) open($('license').href);
+});
+
 const fitTerminal = () => (document.fullscreenElement ? terminal.fit(terminal.clientWidth, terminal.clientHeight) : terminal.fit());
 addEventListener('resize', fitTerminal);
 document.addEventListener('fullscreenchange', () => {

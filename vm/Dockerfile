@@ -30,7 +30,7 @@ EOF
 # /etc/hostname は docker export で上書きされるので、ホスト名もここで設定する
 COPY <<'EOF' /root/.profile
 if [ "$(tty)" = /dev/ttyS0 ]; then
-  hostname forcage
+  hostname localhost
   stty rows 30 cols 100
 fi
 export LANG=C.UTF-8

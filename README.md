@@ -1,4 +1,4 @@
-# tmux 促成講座
+# How to tmux
 
 ブラウザで動く Linux の講座で、今は tmux のショートカットを学ぶモジュールがあります。ブラウザ内の Linux VM（[v86](https://github.com/copy/v86)）で本物の tmux 3.5a を動かし、[xterm.js](https://github.com/xtermjs/xterm.js) で表示します。サーバー側の処理はなく、静的ファイルの配信だけで動きます。
 
@@ -11,7 +11,7 @@ vm/build.sh  # dist/site に配信物を作る（2 分ほど）
 python3 vm/serve.py
 ```
 
-http://127.0.0.1:8000/ を開きます。`dist/site` のページとシナリオはソースへのシンボリックリンクなので、編集して再読み込みすれば反映されます（`python3 -m http.server` で配信すると、JS が古いキャッシュのまま読まれることがあります）。`vm/build.sh` を実行し直すのは、`vm/Dockerfile`、`vm/make-state.mjs`、v86 や xterm.js の版を変えたときだけです。
+http://127.0.0.1:8000/ を開きます。`dist/site` のページとシナリオはソースへのシンボリックリンクなので、編集して再読み込みすれば反映されます（`python3 -m http.server` で配信すると、JS が古いキャッシュのまま読まれることがあります）。`vm/build.sh` を実行し直すのは、`vm/Dockerfile`、`vm/make-state.mjs`、`LICENSE.txt`（VM の `/LICENSE` にも入る）、v86 や xterm.js の版を変えたときだけです。OGP 画像とアイコンの元（`brand/*.html`）を直したときは、`vm/render-images.sh dist/site` で PNG を作り直します。
 
 テストは `pnpm test` です。`dist/site` をヘッドレス Chrome で開き、tmux の操作、ハイライト、配置の通知、`run()`、CSP を確かめたうえで、シナリオの全レッスンを画面から通します（1 分ほど）。Chrome の場所が違うときは環境変数 `CHROME` で指定します。
 
@@ -157,8 +157,10 @@ const code = await terminal.run('[ $(tmux list-panes | wc -l) -eq 2 ]');
 | `lesson-player.js` | シナリオを読み込み、レッスンを進める |
 | `courses/` | シナリオと、モジュール共通の部品 |
 | `tmux-terminal.js` | `<tmux-terminal>` 要素 |
+| `brand/` | OGP 画像とアイコンの元の HTML |
 | `vm/Dockerfile` | VM のイメージ、`run()` の窓口（`lesson-agent`）、`.tmux.conf`。**設定エラーがあると tmux はエラー表示で起動する** |
 | `vm/build.sh` | 配信物のビルド。v86 と xterm.js の版もここで固定している |
+| `vm/render-images.sh` | `brand/*.html` を Chrome で PNG にする |
 | `vm/make-state.mjs` | VM を起動し、tmux が動いている状態を保存する。ページはここから復元する |
 | `vm/serve.py` | 開発用の配信。ブラウザに毎回更新を確かめさせる |
 | `vm/smoke.mjs` | `pnpm test` の中身 |
@@ -168,5 +170,14 @@ const code = await terminal.run('[ $(tmux list-panes | wc -l) -eq 2 ]');
 ## 公開する前に
 
 - `dist/site` のページとシナリオはシンボリックリンクなので、`cp -RL dist/site <公開先>` で実体にしてから公開してください。
-- Linux カーネルや BusyBox を配布することになるので、GPL への対応（ソースの提供など）が必要です。
+- Linux カーネルや BusyBox を配布することになるので、GPL への対応（ソースの提供など）が必要です。このリポジトリのライセンスを GPL にしても、この対応の代わりにはなりません。
 - `<ユーザー>.github.io` は配下のプロジェクトでオリジンを共有します。`localStorage` などを使うなら、専用のドメインで公開してください。
+- OGP の画像は絶対 URL でないと読まれません。`https://kamataryo.github.io/how-to-tmux/` 以外で公開するときは、`index.html` の `og:url` と `og:image` を書き換えてください。
+
+## ライセンス
+
+Copyright (C) 2026 kamataryo
+
+このリポジトリのコードは [GPL-3.0-or-later](LICENSE.txt) です。配信物に含まれる v86、xterm.js、SeaBIOS と、VM のイメージの中身（Linux カーネル、BusyBox、tmux など）は、それぞれのライセンスに従います。
+
+`LICENSE.txt` の 674 行目までは GPL の原文で、冒頭に変更を禁じる記述があるので編集しません。条項は 621 行目の `END OF TERMS AND CONDITIONS` までで、その後ろは適用のしかたの説明です。そこにあるプレースホルダ（`<year>` など）は自分の告知へ写して使う雛形なので原文のままにし、埋めた告知は 675 行目以降に書いています。

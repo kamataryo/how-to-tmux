@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- アイコンの元。512×512 で vm/render-images.sh が PNG にする。タブの 16px でも読めるよう、文字を入れず面だけで描く -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Icon</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      /* body の背景はキャンバス全体に広がって角丸にならないので、別の要素に塗る */
+      .icon {
+        display: grid;
+        grid-template: 1fr 1fr 72px / 3fr 2fr;
+        gap: 28px;
+        width: 512px;
+        height: 512px;
+        padding: 56px;
+        border-radius: 104px; /* iOS の角丸より小さいので、透明な部分は iOS で切り落とされて見えない */
+        background: #1e1e1e;
+      }
+      .icon > div {
+        border-radius: 20px;
+      }
+      /* OGP と同じ色。左がアクティブなペイン、右が他のペイン、下がステータスバー */
+      .active {
+        grid-row: span 2;
+        background: #fc0;
+      }
+      .pane {
+        background: #55565c;
+      }
+      .status {
+        grid-column: span 2;
+        background: #4e9a06;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="icon">
+      <div class="active"></div>
+      <div class="pane"></div>
+      <div class="pane"></div>
+      <div class="status"></div>
+    </div>
+  </body>
+</html>

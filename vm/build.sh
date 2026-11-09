@@ -6,7 +6,7 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(dirname "$HERE")
 OUT=${OUT:-$ROOT/dist}
-NAME=v86-tmux-forcage
+NAME=v86-how-to-tmux
 
 # どれも公開から 1 か月以上たった版に固定する。コミットは v86 0.5.470 の公開直前のもの
 V86_VERSION=0.5.470
@@ -31,6 +31,7 @@ for f in bios/seabios.bin bios/vgabios.bin; do curl -fsS -o "$SITE/$f" "$RAW/$f"
 docker build "$HERE" --platform linux/386 --rm --tag "$NAME"
 docker rm "$NAME" 2>/dev/null || true
 docker create --platform linux/386 --name "$NAME" "$NAME"
+docker cp "$ROOT/LICENSE.txt" "$NAME:/LICENSE" # ライセンスのリンクで less に開く。ビルドのコンテキストは vm/ なので Dockerfile からは読めない
 docker export "$NAME" -o "$WORK/rootfs.tar"
 docker rm "$NAME"
 
@@ -45,5 +46,6 @@ docker run --rm -v "$WORK:/work" -v "$SITE/images:/images" python:3.14-alpine sh
 
 node "$HERE/make-state.mjs" "$SITE" "$WORK/fs.json"
 # 編集がそのまま反映されるようリンクにする。公開するときは cp -RL で実体にする
-ln -s "$ROOT/index.html" "$ROOT/tmux-terminal.js" "$ROOT/lesson-player.js" "$ROOT/courses" "$SITE/"
+ln -s "$ROOT/index.html" "$ROOT/tmux-terminal.js" "$ROOT/lesson-player.js" "$ROOT/courses" "$ROOT/LICENSE.txt" "$SITE/"
+"$HERE/render-images.sh" "$SITE"
 echo "完了: $SITE"

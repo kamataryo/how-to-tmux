@@ -16,7 +16,7 @@ assert.ok(existsSync(path.join(site, 'images/state.bin.zst')), `${site} に配�
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const server = spawn('python3', ['-I', '-m', 'http.server', String(PORT), '--bind', '127.0.0.1', '-d', site], { stdio: 'ignore' });
-const profile = mkdtempSync(path.join(tmpdir(), 'tmux-forcage-smoke-'));
+const profile = mkdtempSync(path.join(tmpdir(), 'how-to-tmux-smoke-'));
 const chrome = spawn(chromePath, ['--headless=new', `--user-data-dir=${profile}`, '--remote-debugging-port=0', '--window-size=1440,900', '--screen-info={1440x900}', '--no-first-run', '--no-default-browser-check', '--disable-extensions', 'about:blank'], { stdio: 'ignore' });
 
 async function waitUntil(what, check, timeout = 30_000) {
@@ -81,6 +81,15 @@ try {
   await waitUntil('起動時の配置', () => evaluate(`tmux.layout?.panes.length === 1`));
   await waitUntil('setup で番号を振り直した後のウィンドウ番号', () => evaluate(`tmux.layout.window === 0`));
 
+  // アイコンと OGP 画像が配信物にあり、CSP で読める
+  for (const [file, width] of [['icon.png', 512], ['ogp.png', 1200]]) {
+    const loaded = await evaluate(`new Promise((resolve) => { const image = new Image(); image.onload = () => resolve(image.naturalWidth); image.onerror = () => resolve(0); image.src = './${file}'; })`);
+    assert.equal(loaded, width, `${file} を読めません`);
+  }
+  // ライセンスはダウンロードにならず、ブラウザで読める形式で配信される
+  const license = await fetch(await evaluate(`document.getElementById('license').href`));
+  assert.ok(license.ok && license.headers.get('content-type').startsWith('text/plain'), `ライセンスを読めません: ${license.status} ${license.headers.get('content-type')}`);
+
   // ハイライトが文字の位置と一致する（文字盤の外へはみ出さない）
   const offset = await evaluate(`(() => {
     const row = [...document.querySelectorAll('.xterm-rows > div')].at(-1);
@@ -129,6 +138,31 @@ try {
   assert.ok(!(await evaluate(`hooks.some((line) => line.startsWith('run-'))`)), 'run() の出力が tmux-hook に流れました');
   assert.equal(await evaluate(`tmux.run('true\\nfalse').catch((error) => error.name)`), 'TypeError');
   assert.equal(await evaluate(`document.createElement('tmux-terminal').run('true').catch((error) => error.message)`), 'VM の起動前です');
+
+  // ライセンスのリンクは、プロンプトが見えていれば端末の less で開く。打ちかけの入力を消せないと less が動かず、表示されない。
+  // 今は左右に分割した幅 49 のペインにいるので、fold が効いていれば次の語は行頭に来る（効いていないと ver で切れる）
+  const paneRuns = async (command) => (await run(`[ "$(tmux display -p '#{pane_current_command}')" = ${command} ]`)) === 0;
+  const clickLicense = () => evaluate(`window.opened = []; window.open = (url) => opened.push(url); document.getElementById('license').click()`);
+  await page('Input.insertText', { text: 'half-typed' });
+  await waitUntil('打ちかけの入力', async () => (await screen()).includes('half-typed'));
+  await clickLicense();
+  await waitUntil('端末でのライセンスの表示', async () => (await paneRuns('less')) && (await run(`tmux capture-pane -p | grep -qx 'verbatim copies'`)) === 0);
+  assert.equal(await evaluate(`opened.length`), 0, 'プロンプトが見えているのに新しいタブを開きました');
+  await run('tmux send-keys q');
+  await waitUntil('less の終了', () => paneRuns('sh'));
+  // 端末を最小化したまま開いても見えないので、元に戻す
+  await evaluate(`document.querySelector('#terminal-window .minimize').click()`);
+  await clickLicense();
+  await waitUntil('最小化の解除', () => evaluate(`!document.getElementById('terminal-window').classList.contains('minimized')`));
+  await waitUntil('最小化から戻した端末の less', () => paneRuns('less'));
+  await run('tmux send-keys q');
+  await waitUntil('less の終了', () => paneRuns('sh'));
+  // コピーモードの最中はキーを送らず、新しいタブで開く
+  await run('tmux copy-mode');
+  await clickLicense();
+  await waitUntil('コピーモード中のライセンスの表示', () => evaluate(`opened.length === 1`));
+  assert.equal(await run(`[ "$(tmux display -p '#{pane_in_mode}')" = 1 ]`), 0, 'リンクを押すとコピーモードが終わりました');
+  await run('tmux send-keys -X cancel');
 
   // F6 で端末と欄を行き来できる（端末は Tab も受け取るので、これがキーボードで欄へ移る唯一の方法）
   await press('F6', 'F6', 117, 0);
@@ -336,6 +370,8 @@ try {
   assert.equal(await evaluate(`!!document.querySelector('tmux-terminal')`), false);
   assert.equal(await evaluate(`getComputedStyle(document.getElementById('terminal-window')).display`), 'none');
   assert.ok((await status()).includes('やり直す'));
+  await clickLicense();
+  await waitUntil('端末を消した後のライセンスの表示', () => evaluate(`opened.length === 1`));
   await evaluate(`document.activeElement.blur()`); // 余白をクリックした後と同じ。フォーカスを戻せないときにキー入力の転送が再帰しない
   await press('a', 'KeyA', 65, 0, 'a');
   await evaluate(`document.body.click()`);

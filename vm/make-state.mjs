@@ -42,7 +42,7 @@ async function waitFor(pattern, what) {
 }
 
 // BusyBox の ash はプロンプトの直後にカーソル位置の問い合わせを送る
-await waitFor(/forcage:~# (\x1b\[6n)?$/, 'ログイン');
+await waitFor(/localhost:~# (\x1b\[6n)?$/, 'ログイン');
 emulator.serial0_send('tmux new -s lesson\n');
 await waitFor(/\[lesson\]/, 'tmux 起動');
 

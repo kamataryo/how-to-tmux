@@ -23,8 +23,8 @@ import { ALIVE, RESET } from './common.js';
 import tmux from './tmux.js';
 
 export default {
-  id: 'tmux-forcage',
-  title: 'tmux 促成講座',
+  id: 'how-to-tmux',
+  title: 'How to tmux',
   setup: RESET,
   alive: ALIVE,
   modules: [tmux],

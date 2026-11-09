@@ -9,9 +9,17 @@
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src blob:; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; worker-src blob:; base-uri 'none'; form-action 'none'"
     />
     <title>How to tmux</title>
+    <link rel="icon" href="./icon.png" />
+    <link rel="apple-touch-icon" href="./icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="How to tmux" />
+    <meta property="og:url" content="https://kamataryo.github.io/how-to-tmux/" />
+    <meta property="og:image" content="https://kamataryo.github.io/how-to-tmux/ogp.png" />
+    <meta property="og:image:alt" content="How to tmux" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="./xterm/xterm.css" />
     <style>
       :root {
@@ -177,6 +185,13 @@
         color: #a0a0a0;
         font-size: 13px;
       }
+      #license {
+        float: right;
+        color: inherit;
+      }
+      #license:hover {
+        color: #fc0;
+      }
       /* 進行中のステップを下端に揃える。上へはみ出した行は薄くなって消える（スクロールすれば読める） */
       #steps {
         display: flex;
@@ -287,7 +302,8 @@
             <a id="next-lesson" hidden>次のレッスンへ</a>
             <button id="restart">このレッスンをやり直す</button>
           </p>
-          <p id="note"><kbd>F6</kbd> で端末とこの欄を行き来できます。</p>
+          <!-- ふだんは端末の less で開く（lesson-player.js）。できないときは新しいタブで開く。同じタブで開くと VM とレッスンの状態が消える -->
+          <p id="note"><kbd>F6</kbd> で端末とこの欄を行き来できます。<a id="license" href="./LICENSE.txt" target="_blank">GPL-3.0-or-later</a></p>
         </div>
       </section>
       <section id="terminal-window" class="window" aria-labelledby="terminal-title">

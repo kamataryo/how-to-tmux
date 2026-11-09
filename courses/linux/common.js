@@ -29,3 +29,10 @@ export const RESET = [
 
 // デタッチ中は成功し、tmux が終了していると失敗する
 export const ALIVE = 'tmux has-session -t lesson';
+
+// ライセンスを端末に表示する。top やコピーモードの最中に打つとキー操作になり、デタッチ中は見えないセッションへ届くので、
+// シェルのプロンプトが見えているときだけ打つ。打ちかけの入力があると一緒に実行されるので、Ctrl-u で消す。
+// 分割で狭くなったペインでは単語の途中で折り返されるので、fold で単語の切れ目で折る。
+// fold | less とつなぐと先に終わる fold がプロセスグループの先頭になり、tmux が less の表示中も sh と報告するので、ファイルを介す。
+// less は閉じるまで動き続け、その間の入力はシェルに届かないので、閉じ方をステータスバーに出す
+export const SHOW_LICENSE = `${clientAttached} && ${display('#{pane_in_mode}:#{pane_current_command}', '0:sh')} && fold -s -w "$(tmux display -p '#{pane_width}')" /LICENSE >/tmp/LICENSE && tmux send-keys C-u 'less /tmp/LICENSE' Enter && tmux display-message -d 5000 'q で閉じます'`;
