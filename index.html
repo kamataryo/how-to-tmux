@@ -185,11 +185,12 @@
         color: #a0a0a0;
         font-size: 13px;
       }
-      #license {
+      #note a {
         float: right;
+        margin-left: 1em;
         color: inherit;
       }
-      #license:hover {
+      #note a:hover {
         color: #fc0;
       }
       /* 進行中のステップを下端に揃える。上へはみ出した行は薄くなって消える（スクロールすれば読める） */
@@ -303,7 +304,7 @@
             <button id="restart">このレッスンをやり直す</button>
           </p>
           <!-- ふだんは端末の less で開く（lesson-player.js）。できないときは新しいタブで開く。同じタブで開くと VM とレッスンの状態が消える -->
-          <p id="note"><kbd>F6</kbd> で端末とこの欄を行き来できます。<a id="license" href="./LICENSE.txt" target="_blank">GPL-3.0-or-later</a></p>
+          <p id="note"><kbd>F6</kbd> で端末とこの欄を行き来できます。<a id="license" href="./LICENSE.txt" target="_blank">GPL-3.0-or-later</a><a href="https://github.com/kamataryo/how-to-tmux" target="_blank">ソース</a></p>
         </div>
       </section>
       <section id="terminal-window" class="window" aria-labelledby="terminal-title">

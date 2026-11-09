@@ -695,3 +695,18 @@ Source code: <https://github.com/kamataryo/how-to-tmux>
 
 The Linux kernel, BusyBox, tmux, v86, xterm.js, SeaBIOS and other third-party
 software distributed with this program are covered by their own licenses.
+The version and license of each package in the VM image are listed in
+packages.txt, published next to index.html.
+
+Written offer for the VM image: for at least three years after you received
+this program, kamataryo will give any third party, for a charge no more than
+the cost of physically performing source distribution, a complete
+machine-readable copy of the corresponding source code of the packages in the
+VM image that are covered by the GPL or LGPL, on a medium customarily used for
+software interchange. To request it, open an issue at
+<https://github.com/kamataryo/how-to-tmux/issues>.
+
+SeaBIOS (bios/seabios.bin and bios/vgabios.bin) is covered by the LGPL-3.0.
+Its source is the tag rel-1.16.2 of <https://git.seabios.org/seabios.git>,
+built with the configuration and script in
+<https://github.com/copy/v86/tree/6db8b157974dbaf1b54d2c2ec12dd71ddc1891e9/bios>.

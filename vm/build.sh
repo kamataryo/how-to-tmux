@@ -8,7 +8,8 @@ ROOT=$(dirname "$HERE")
 OUT=${OUT:-$ROOT/dist}
 NAME=v86-how-to-tmux
 
-# どれも公開から 1 か月以上たった版に固定する。コミットは v86 0.5.470 の公開直前のもの
+# どれも公開から 1 か月以上たった版に固定する。コミットは v86 0.5.470 の公開直前のもの。
+# V86_COMMIT を変えたら LICENSE.txt の SeaBIOS の版とリンクも直す
 V86_VERSION=0.5.470
 V86_COMMIT=6db8b157974dbaf1b54d2c2ec12dd71ddc1891e9
 XTERM_VERSION=6.0.0
@@ -29,6 +30,8 @@ for f in tools/fs2json.py tools/copy-to-sha256.py; do curl -fsS -o "$WORK/$f" "$
 for f in bios/seabios.bin bios/vgabios.bin; do curl -fsS -o "$SITE/$f" "$RAW/$f"; done
 
 docker build "$HERE" --platform linux/386 --rm --tag "$NAME"
+# LICENSE.txt のソース提供の申し出が対象とする版の一覧。apk add は版を固定していないので、ビルドごとに書き出す
+docker run --rm --platform linux/386 "$NAME" apk list -I >"$SITE/packages.txt"
 docker rm "$NAME" 2>/dev/null || true
 docker create --platform linux/386 --name "$NAME" "$NAME"
 docker cp "$ROOT/LICENSE.txt" "$NAME:/LICENSE" # ライセンスのリンクで less に開く。ビルドのコンテキストは vm/ なので Dockerfile からは読めない
