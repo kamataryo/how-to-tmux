@@ -73,7 +73,23 @@ try {
   await waitUntil('サーバーの起動', () => fetch(origin).then((r) => r.ok).catch(() => false));
   await page('Page.navigate', { url: `${origin}/index.html` });
   await waitUntil('tmux のステータスライン', async () => (await screen())?.includes('[lesson]'));
-  await evaluate(`window.hooks = []; addEventListener('tmux-hook', (e) => hooks.push(e.detail)); document.querySelector('tmux-terminal').focus();`);
+  await evaluate(`window.hooks = []; addEventListener('tmux-hook', (e) => hooks.push(e.detail)); window.tmux = document.querySelector('tmux-terminal'); tmux.focus();`);
+  await waitUntil('起動時の配置', () => evaluate(`tmux.layout?.panes.length === 1`));
+
+  // ハイライトが文字の位置と一致する（文字盤の外へはみ出さない）
+  const offset = await evaluate(`(() => {
+    const row = [...document.querySelectorAll('.xterm-rows > div')].at(-1);
+    const range = document.createRange();
+    const text = document.createTreeWalker(row, NodeFilter.SHOW_TEXT).nextNode();
+    range.setStart(text, 0);
+    range.setEnd(text, 8);
+    const expected = range.getBoundingClientRect();
+    const box = tmux.highlight(0, 29, 8, 1);
+    const actual = box.getBoundingClientRect();
+    box.remove();
+    return Math.max(...['left', 'top', 'width', 'height'].map((side) => Math.abs(actual[side] - expected[side])));
+  })()`);
+  assert.ok(offset < 1, `ハイライトが文字から ${offset}px ずれています`);
 
   await page('Input.insertText', { text: 'tmux -V' });
   await press('Enter', 'Enter', 13, 0, '\r');
@@ -83,6 +99,15 @@ try {
   await waitUntil('tmux のバージョン表示', async () => (await screen()).includes('tmux 3.'));
   await waitUntil('Ctrl-b % の tmux-hook', () => evaluate(`hooks.includes('split-window')`));
   await waitUntil('ペインの境界線', async () => (await screen()).includes('│'));
+  await waitUntil('分割後の配置', () => evaluate(`tmux.layout.panes.length === 2 && tmux.layout.panes[1].active`));
+
+  // 形式の合わない配置の通知は捨てる
+  const before = await evaluate(`JSON.stringify(tmux.layout)`);
+  await page('Input.insertText', { text: `echo 'layout <img src=x>' >/dev/ttyS1; echo checked >/dev/ttyS1` });
+  await press('Enter', 'Enter', 13, 0, '\r');
+  await waitUntil('不正な通知の後の通知', () => evaluate(`hooks.includes('checked')`));
+  assert.equal(await evaluate(`JSON.stringify(tmux.layout)`), before, '不正な通知で配置が変わりました');
+  assert.ok(!(await evaluate(`hooks.some((line) => line.startsWith('layout'))`)), '不正な通知が tmux-hook に流れました');
 
   assert.deepEqual(problems, [], 'コンソールにエラーがあります（CSP 違反を含む）');
   const external = requested.filter((url) => !url.startsWith(`${origin}/`) && !url.startsWith('blob:') && !url.startsWith('data:'));

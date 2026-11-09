@@ -1,20 +1,42 @@
-// <tmux-terminal> : ブラウザ内の Linux VM（v86）で動く本物の tmux を表示する。
-// 端末は 100×30 桁で固定（vm/Dockerfile の stty と揃える）。
-// tmux の操作は tmux-hook イベントで通知する（detail は "split-window" など。bubbles）。
+// <tmux-terminal> : ブラウザ内の Linux VM（v86）で動く本物の tmux を表示する。使い方は README.md を参照。
 //
 // VM の中は利用者が root で自由に操作できるので、VM からの出力はすべて信頼できない入力として扱う。
-// tmux-hook の detail を innerHTML に入れない。レッスンの判定は偽装できる前提で、権限や認定には使わない。
+// イベントの detail を innerHTML に入れない。レッスンの判定は偽装できる前提で、権限や認定には使わない。
 
 import { V86 } from './v86/libv86.mjs';
 import { Terminal } from './xterm/xterm.mjs';
 
+const COLS = 100; // vm/Dockerfile の stty と揃える
+const ROWS = 30;
 const encoder = new TextEncoder();
+
+// 例: "layout 0 0 %0:0:0:50:29:1 %1:51:0:49:29:0"（ウィンドウ番号、ズーム中か、ペインごとの id:桁:行:幅:高さ:アクティブか）
+// VM 由来なので形式が合わないものは捨てる。vm/Dockerfile の NOTIFY_LAYOUT と揃える
+const PANE = String.raw`%\d+:\d+:\d+:\d+:\d+:[01]`;
+const LAYOUT_LINE = new RegExp(`^layout (\\d+) ([01]) (${PANE}(?: ${PANE})*)$`);
+
+function parseLayout(line) {
+  const match = LAYOUT_LINE.exec(line);
+  if (!match) return null;
+  const [, window, zoomed, panes] = match;
+  return {
+    window: Number(window),
+    zoomed: zoomed === '1',
+    panes: panes.split(' ').map((pane) => {
+      const [id, col, row, width, height, active] = pane.split(':');
+      return { id, col: Number(col), row: Number(row), width: Number(width), height: Number(height), active: active === '1' };
+    }),
+  };
+}
 
 class TmuxTerminal extends HTMLElement {
   #vm;
   #term;
+  #overlay;
+  #layout = null;
 
   connectedCallback() {
+    this.#layout = null;
     const progress = document.createElement('progress');
     progress.setAttribute('aria-label', '環境を読み込み中');
     progress.style.width = '100%';
@@ -22,14 +44,21 @@ class TmuxTerminal extends HTMLElement {
 
     // VM の出力でリンクを開かせない（講座にはリンクは要らず、偽リンクの踏み台にもなる）
     const term = new Terminal({
-      cols: 100,
-      rows: 30,
+      cols: COLS,
+      rows: ROWS,
       fontFamily: 'Menlo, Consolas, monospace',
       fontSize: 14,
       linkHandler: { activate() {} },
     });
     term.open(this);
     this.#term = term;
+
+    // highlight() の置き場。文字盤と同じ大きさなので、位置を % で指定すればスクロールしてもずれない。
+    // 座標は VM から偽装できるが、はみ出した分は overflow で切れる
+    this.#overlay = document.createElement('div');
+    this.#overlay.setAttribute('aria-hidden', 'true');
+    Object.assign(this.#overlay.style, { position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 10 });
+    term.element.querySelector('.xterm-screen').append(this.#overlay);
 
     const vm = new V86({
       wasm_path: 'v86/v86.wasm',
@@ -76,14 +105,14 @@ class TmuxTerminal extends HTMLElement {
       pending.push(byte);
     });
 
-    let hook = '';
+    let line = '';
     vm.add_listener('serial1-output-byte', (byte) => {
       const char = String.fromCharCode(byte);
       if (char === '\n') {
-        this.dispatchEvent(new CustomEvent('tmux-hook', { bubbles: true, detail: hook.trim() }));
-        hook = '';
+        this.#onVmLine(line.trim());
+        line = '';
       } else {
-        hook = (hook + char).slice(-256); // VM が改行なしで流し続けても溜めない
+        line = (line + char).slice(-4096); // VM が改行なしで流し続けても溜めない
       }
     });
   }
@@ -93,8 +122,40 @@ class TmuxTerminal extends HTMLElement {
     this.#term.dispose();
   }
 
+  #onVmLine(line) {
+    if (!line.startsWith('layout ')) {
+      this.dispatchEvent(new CustomEvent('tmux-hook', { bubbles: true, detail: line }));
+      return;
+    }
+    const layout = parseLayout(line);
+    if (!layout) return;
+    this.#layout = layout;
+    this.dispatchEvent(new CustomEvent('tmux-layout', { bubbles: true, detail: layout }));
+  }
+
   focus() {
     this.#term?.focus();
+  }
+
+  /** 最後に届いたペインの配置。起動直後の最初の通知までは null */
+  get layout() {
+    return this.#layout;
+  }
+
+  /** 文字盤の桁・行（0 始まり）で矩形を重ねて描く。返り値は普通の要素で、remove() で消せる */
+  highlight(col, row, width, height) {
+    const box = document.createElement('div');
+    Object.assign(box.style, {
+      position: 'absolute',
+      boxSizing: 'border-box',
+      left: `${(col / COLS) * 100}%`,
+      top: `${(row / ROWS) * 100}%`,
+      width: `${(width / COLS) * 100}%`,
+      height: `${(height / ROWS) * 100}%`,
+      border: '2px solid #fc0',
+      background: '#ffcc0033',
+    });
+    return this.#overlay.appendChild(box);
   }
 }
 

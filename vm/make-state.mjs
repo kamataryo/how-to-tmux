@@ -45,8 +45,12 @@ await waitFor(/forcage:~# (\x1b\[6n)?$/, 'ログイン');
 emulator.serial0_send('tmux new -s lesson\n');
 await waitFor(/\[lesson\]/, 'tmux 起動');
 
-// 空きページを 0 にして圧縮を効かせる。実行中のプロセスのページは残る
-emulator.serial0_send('sync; echo 3 >/proc/sys/vm/drop_caches; clear\n');
+// 空きページを 0 にして圧縮を効かせる。実行中のプロセスのページは残る。
+// .tmux.conf にエラーがあると tmux はエラー表示を開き、ここで打った文字はシェルに届かない。
+// そのまま保存すると壊れた状態を配ることになるので、シェルが応答しなければビルドを失敗させる
+// （打った文字列そのものに一致しないよう、結果は計算させる）
+emulator.serial0_send('sync; echo 3 >/proc/sys/vm/drop_caches; echo shell-ok-$((6*7)); clear\n');
+await waitFor(/shell-ok-42/, 'シェルの応答');
 await sleep(10_000);
 
 const file = path.join(site, 'images/state.bin');
