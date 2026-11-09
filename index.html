@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      wasm-unsafe-eval: v86 が実行時に WebAssembly を生成する / worker-src blob: v86 の zstd 展開
+      style-src unsafe-inline: xterm.js が style 要素を差し込む
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src blob:; base-uri 'none'; form-action 'none'"
+    />
+    <title>tmux 促成講座</title>
+    <link rel="stylesheet" href="./xterm/xterm.css" />
+    <style>
+      body {
+        margin: 0;
+        background: #000;
+        color: #d0d0d0;
+      }
+      tmux-terminal {
+        display: block;
+        overflow: auto;
+      }
+    </style>
+    <script type="module" src="./tmux-terminal.js"></script>
+  </head>
+  <body>
+    <tmux-terminal></tmux-terminal>
+  </body>
+</html>
