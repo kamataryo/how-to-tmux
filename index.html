@@ -254,9 +254,15 @@
         gap: 12px;
         min-height: 32px; /* #next の高さ。#next が消えても手順の欄の高さが変わらないようにする */
       }
+      /* 進むための主なボタンなので、「やり直す」より目立たせる */
       #next {
         padding: 2px 16px;
+        border: 1px solid #fc0;
+        border-radius: 4px;
+        background: #fc0;
+        color: #000;
         font-weight: bold;
+        cursor: pointer;
       }
       #next-lesson {
         color: #fc0;

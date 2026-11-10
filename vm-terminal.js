@@ -37,6 +37,7 @@ export class VmTerminal extends HTMLElement {
       fontFamily: 'Menlo, Consolas, monospace',
       fontSize: FONT_SIZE,
       linkHandler: { activate() {} },
+      theme: { black: '#000000' }, // 既定の黒は灰色がかっていて、緑のステータスバーの上で読みにくい
     });
     term.open(this);
     this.#term = term;
@@ -197,7 +198,7 @@ export class VmTerminal extends HTMLElement {
       width: `${(width / COLS) * 100}%`,
       height: `${(height / ROWS) * 100}%`,
       border: '2px solid #fc0',
-      background: '#ffcc0033',
+      background: '#ffcc001a', // 下の文字が読めるよう薄くする
     });
     return this.#overlay.appendChild(box);
   }

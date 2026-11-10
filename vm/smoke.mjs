@@ -255,6 +255,20 @@ try {
   assert.ok(Math.abs(stepMove.nextBelow) < 1, `次のステップが欄の下から現れません: ${stepMove.nextBelow}`);
   assert.equal(stepMove.nextOpacity, '0');
 
+  // 先に次のステップの状態になっていても、読む前に進まない。
+  // 上下に分けてから左右に分けると「左右に分ける」は合格し、次の「上下に分ける」は操作する前から合格している
+  const [, splitRight, splitDown, afterSplit] = lessons[0].steps;
+  assert.equal(await currentStep(), splitRight.id);
+  await run('tmux split-window -v');
+  for (const token of splitRight.do) await pressToken(token);
+  await waitUntil('先に合格していたステップの「次へ」', async () => (await currentStep()) === splitDown.id && (await evaluate(`!document.getElementById('next').hidden`)));
+  await sleep(600);
+  assert.equal(await currentStep(), splitDown.id, '先に合格していたステップが飛ばされました');
+  assert.ok((await evaluate(`document.getElementById('status').textContent`)).includes('次へ'));
+  await evaluate(`document.getElementById('next').click()`);
+  await waitUntil('「次へ」で進む', async () => (await currentStep()) === afterSplit.id);
+  assert.equal(await evaluate(`document.getElementById('status').textContent`), '');
+
   // デタッチ中にレッスンを移ると、端末を戻せないので VM を作り直してから始める
   const second = lessons[1];
   await run('tmux detach-client');
