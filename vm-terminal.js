@@ -15,12 +15,16 @@ const encoder = new TextEncoder();
 const RUN_RESULT = /^run (\d+) (\d+)$/;
 const RUN_TIMEOUT = 15_000;
 const PING_TIMEOUT = 2_000;
+const MAX_COLS = 300; // 極端に大きな画面でも、VM の描画が追いつく範囲にとどめる
+const MAX_ROWS = 100;
 
 export class VmTerminal extends HTMLElement {
   #vm;
   #term;
   #overlay;
   #ready = false;
+  #cols = COLS;
+  #rows = ROWS;
   #runs = new Map();
   #lastRun = 0;
 
@@ -104,6 +108,8 @@ export class VmTerminal extends HTMLElement {
 
   disconnectedCallback() {
     this.#ready = false;
+    this.#cols = COLS; // 付け直すと VM は最初の状態から始まる
+    this.#rows = ROWS;
     for (const run of this.#runs.values()) run.reject(new Error('VM を破棄しました'));
     // 読み込み中の v86 は破棄できず、放っておくと読み込み後に動き出すので、起動を待って破棄する
     const vm = this.#vm;
@@ -170,7 +176,7 @@ export class VmTerminal extends HTMLElement {
     this.#vm?.serial_send_bytes(0, encoder.encode(data));
   }
 
-  /** 文字盤を width×height（px）に収まる文字の大きさにする。桁数と行数は変えない。引数なしで元の大きさへ戻す */
+  /** 文字盤を width×height（px）に収まる文字の大きさにする。桁数と行数は変えない。引数なしで元の大きさへ戻す。大きくはしない */
   fit(width, height) {
     if (!this.isConnected) return;
     const { options, element } = this.#term;
@@ -179,7 +185,36 @@ export class VmTerminal extends HTMLElement {
       return;
     }
     const screen = element.querySelector('.xterm-screen');
-    options.fontSize = Math.floor(options.fontSize * Math.min(width / screen.offsetWidth, height / screen.offsetHeight));
+    options.fontSize = Math.min(FONT_SIZE, Math.floor(options.fontSize * Math.min(width / screen.offsetWidth, height / screen.offsetHeight)));
+  }
+
+  /** 今の桁数と行数。fill() で変わる */
+  get cols() {
+    return this.#cols;
+  }
+
+  get rows() {
+    return this.#rows;
+  }
+
+  /**
+   * 文字の大きさを変えずに、width×height（px）に収まる桁数と行数にする。引数なしで元の桁数と行数へ戻す。
+   * VM の端末にも同じ大きさを伝えるので、中で動いているプログラムは端末の大きさが変わったときと同じように描き直す。
+   * VM の起動前は何もしない
+   */
+  async fill(width, height) {
+    if (!this.#ready) return;
+    let [cols, rows] = [COLS, ROWS];
+    if (width) {
+      const screen = this.#term.element.querySelector('.xterm-screen');
+      cols = Math.max(COLS, Math.min(MAX_COLS, Math.floor(width / (screen.offsetWidth / this.#cols))));
+      rows = Math.max(ROWS, Math.min(MAX_ROWS, Math.floor(height / (screen.offsetHeight / this.#rows))));
+    }
+    if (cols === this.#cols && rows === this.#rows) return;
+    [this.#cols, this.#rows] = [cols, rows];
+    this.#term.resize(cols, rows);
+    // シリアルは大きさを伝えないので、VM の中から端末に設定する。動いているプログラムには SIGWINCH が届く
+    await this.#request(`stty -F /dev/ttyS0 rows ${rows} cols ${cols}`, RUN_TIMEOUT).catch(() => null);
   }
 
   /** VM でシェルコマンドを 1 行実行し、終了コードを返す。出力は捨てる。結果は利用者が偽装できる */
@@ -189,16 +224,16 @@ export class VmTerminal extends HTMLElement {
     return this.#request(command, RUN_TIMEOUT);
   }
 
-  /** 文字盤の桁・行（0 始まり）で矩形を重ねて描く。返り値は普通の要素で、remove() で消せる */
+  /** 文字盤の桁・行（0 始まり）で矩形を重ねて描く。負の行は下から数える（-1 が最下行）。返り値は普通の要素で、remove() で消せる */
   highlight(col, row, width, height) {
     const box = document.createElement('div');
     Object.assign(box.style, {
       position: 'absolute',
       boxSizing: 'border-box',
-      left: `${(col / COLS) * 100}%`,
-      top: `${(row / ROWS) * 100}%`,
-      width: `${(width / COLS) * 100}%`,
-      height: `${(height / ROWS) * 100}%`,
+      left: `${(col / this.#cols) * 100}%`,
+      top: `${((row < 0 ? this.#rows + row : row) / this.#rows) * 100}%`,
+      width: `${(width / this.#cols) * 100}%`,
+      height: `${(height / this.#rows) * 100}%`,
       border: '2px solid #fc0',
       background: '#ffcc001a', // 下の文字が読めるよう薄くする
     });
