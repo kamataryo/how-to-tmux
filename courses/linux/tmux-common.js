@@ -1,8 +1,6 @@
 // tmux の中で動くレッスンに共通の部品。どのレッスンも tmux のセッション SESSION の中で動くので、モジュールをまたいで使える。
 // tmux を使わないコースでは使えない。判定の部品は、どれも 1 行のシェルコマンドを返す。
 
-import { COLS, ROWS } from '../../vm-config.js';
-
 // 端末が最初に表示しているセッション。VM のビルドでもこの名前で作る（index.js の vm）
 export const SESSION = 'lesson';
 
@@ -18,7 +16,8 @@ export const onScreen = (pattern) => `tmux capture-pane -p | grep -Eq '${pattern
 // 今のウィンドウのペインでコマンドが動いている。ps で探すと、閉じたウィンドウの終了前のプロセスに反応してしまう
 export const running = (command) => `tmux list-panes -F '#{pane_current_command}' | grep -qx '${command}'`;
 
-export const STATUS_BAR = [0, ROWS - 1, COLS, 1];
+// 最下行の全幅。フルスクリーンでは桁数と行数が増えるので、行は下から数え、幅は余分に取る（はみ出した分は描かれない）
+export const STATUS_BAR = [0, -1, 1000, 1];
 
 // 端末がセッション SESSION の 0 番のウィンドウを表示し、ペインが 1 つだけの状態にする。
 // デタッチ中や tmux の終了後は元に戻せないので最後の確認で失敗し、VM が作り直される

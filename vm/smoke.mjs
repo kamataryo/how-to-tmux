@@ -326,18 +326,24 @@ try {
   assert.ok(await evaluate(`tmux.contains(document.activeElement)`), '最小化から戻すと端末にフォーカスがありません');
   assert.equal(await run('true'), 0);
 
-  // フルスクリーンでは文字盤が画面いっぱいに広がり、欄は常に前面でドラッグできる。桁数と行数は変わらない
-  const rowsBefore = await evaluate(`document.querySelectorAll('.xterm-rows > div').length`);
+  // フルスクリーンでは文字の大きさはそのままで、桁数と行数が画面いっぱいに増える。VM の端末も同じ大きさになる。欄は常に前面でドラッグできる
+  const gridSize = () => evaluate(`({ cols: tmux.cols, rows: tmux.rows })`);
+  // この時点では tmux を作り直していて端末は接続していないので、端末そのものの大きさを見る
+  const clientIs = async ({ cols, rows }) => (await run(`[ "$(stty -F /dev/ttyS0 size)" = '${rows} ${cols}' ]`)) === 0;
+  const normalGrid = await gridSize();
   await clickOn(`${terminalWindow} .maximize`);
   await waitUntil('フルスクリーン', () => evaluate(`!!document.fullscreenElement`));
-  await waitUntil('文字の拡大', async () => (await fontSize()) > 14);
+  await waitUntil('桁数と行数の拡大', async () => { const { cols, rows } = await gridSize(); return cols > normalGrid.cols && rows > normalGrid.rows; });
+  const fullGrid = await gridSize();
+  assert.equal(await fontSize(), 14, 'フルスクリーンで文字の大きさが変わりました');
+  await waitUntil('VM の端末の大きさの拡大', () => clientIs(fullGrid));
   const { innerWidth, innerHeight } = await evaluate(`({ innerWidth, innerHeight })`);
   const titlebarHeight = (await rectOf(`${terminalWindow} .titlebar`)).height;
   const fitted = await screenSize();
   assert.ok(fitted.left >= 0 && fitted.left + fitted.width <= innerWidth && fitted.top >= titlebarHeight && fitted.top + fitted.height <= innerHeight, `文字盤が画面に収まっていません: ${JSON.stringify(fitted)}`);
-  // 文字を 1px 大きくすると、幅は 60px ほど、高さは 34px ほど増える
-  assert.ok(innerWidth - fitted.width < 70 || innerHeight - titlebarHeight - fitted.height < 40, `文字盤が画面を埋めていません: ${JSON.stringify(fitted)}`);
-  assert.equal(await evaluate(`document.querySelectorAll('.xterm-rows > div').length`), rowsBefore);
+  // あと 1 桁、1 行は入らないところまで埋まっている
+  assert.ok(innerWidth - fitted.width < fitted.width / fullGrid.cols + 1 && innerHeight - titlebarHeight - fitted.height < fitted.height / fullGrid.rows + 1, `文字盤が画面を埋めていません: ${JSON.stringify(fitted)}`);
+  assert.equal(await evaluate(`document.querySelectorAll('.xterm-rows > div').length`), fullGrid.rows);
   assert.ok(await evaluate(`document.querySelector('${terminalWindow} .minimize').disabled`), 'フルスクリーン中は最小化できません');
   const inFront = () => evaluate(`(() => { const { left, top, width, height } = document.getElementById('lesson').getBoundingClientRect(); return !!document.elementFromPoint(left + width / 2, top + height / 2).closest('#lesson'); })()`);
   assert.ok(await inFront(), '欄が端末の前面にありません');
@@ -361,7 +367,9 @@ try {
   await dragBar(400, 100);
   await clickOn(`${terminalWindow} .maximize`);
   await waitUntil('フルスクリーンの解除', () => evaluate(`!document.fullscreenElement`));
-  await waitUntil('文字の大きさの復帰', async () => (await fontSize()) === 14);
+  await waitUntil('桁数と行数の復帰', async () => JSON.stringify(await gridSize()) === JSON.stringify(normalGrid));
+  await waitUntil('VM の端末の大きさの復帰', () => clientIs(normalGrid));
+  assert.equal(await fontSize(), 14);
   const lessonRestored = await rectOf('#lesson');
   assert.deepEqual([lessonRestored.left, lessonRestored.top], [lessonRect.left, lessonRect.top], 'ドラッグした位置が残っています');
 

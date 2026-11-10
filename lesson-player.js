@@ -312,10 +312,13 @@ $('license').addEventListener('click', async (event) => {
   if (code !== 0) open($('license').href);
 });
 
-// フルスクリーンでは画面いっぱいにする。ふだんは元の大きさで、画面に収まらないときだけ文字を小さくして収める
+// フルスクリーンでは文字の大きさはそのままで、桁数と行数を画面いっぱいに増やす。
+// ふだんは元の桁数と行数で、画面に収まらないときだけ文字を小さくして収める。
+// 桁数と行数が変わるとハイライトの位置もずれるので、描き直す
 function fitTerminal() {
-  if (document.fullscreenElement) return terminal.fit(terminal.clientWidth, terminal.clientHeight);
   terminal.fit();
+  if (document.fullscreenElement) return terminal.fill(terminal.clientWidth, terminal.clientHeight).then(drawHighlight);
+  terminal.fill().then(drawHighlight);
   if (!terminal.isConnected || terminalWindow.classList.contains('minimized')) return;
   const tooTall = document.documentElement.scrollHeight - innerHeight;
   const tooWide = terminal.scrollWidth - terminal.clientWidth;
