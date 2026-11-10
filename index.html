@@ -26,9 +26,18 @@
         color-scheme: dark;
         accent-color: #fc0;
       }
+      /* 背景は壁紙のように、暗い地に色の光をぼかして重ねる。色は tmux のステータスバーの緑とアクセントの黄、奥行きを出す青と紫 */
+      html {
+        background:
+          radial-gradient(90vmax 70vmax at 10% 5%, #2f6b3f8c, transparent 60%),
+          radial-gradient(80vmax 60vmax at 98% 12%, #6b55188c, transparent 62%),
+          radial-gradient(100vmax 80vmax at 72% 108%, #1e3f7a99, transparent 60%),
+          radial-gradient(70vmax 60vmax at -5% 100%, #47307080, transparent 60%),
+          #101216;
+        background-attachment: fixed;
+      }
       body {
         margin: 0;
-        background: #1a1c22;
         color: #d0d0d0;
         font: 15px/1.6 system-ui, sans-serif;
       }
@@ -47,10 +56,54 @@
         box-sizing: border-box;
         max-width: 100%;
         overflow: hidden;
-        border: 1px solid #4a4a4f;
+        /* macOS のウィンドウの枠と影に寄せる。公式の数値はないので、実物のスクリーンショットから広く使われている近似値。
+           枠は内側の明るい線と外側の黒い細線、影は操作中のウィンドウだけ大きくする */
+        border: 1px solid #ffffff26;
         border-radius: 10px;
         background: #1e1e1e;
-        box-shadow: 0 18px 50px #000a;
+        box-shadow:
+          0 0 0 0.5px #000000cc,
+          0 10px 30px #0000004d;
+        opacity: 0; /* 中身の配置が決まるまで見せない（lesson-player.js が open を付ける） */
+        transition: box-shadow 0.2s;
+      }
+      .window:focus-within {
+        box-shadow:
+          0 0 0 0.5px #000000cc,
+          0 22px 70px 4px #0000008f;
+      }
+      .window:not(:focus-within) .title {
+        color: #8e8e93;
+      }
+      /* 開くときは少し小さいところから、わずかに行き過ぎて止まる。欄は端末に少し遅れて開く */
+      .window.open {
+        opacity: 1;
+        animation: window-open 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.25) backwards;
+      }
+      #lesson.open {
+        animation-delay: 0.09s;
+      }
+      @keyframes window-open {
+        from {
+          opacity: 0;
+          scale: 0.9;
+        }
+        60% {
+          opacity: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .window.open {
+          animation: none;
+        }
+      }
+      /* レッスンの準備で画面が何度か書き換わるので、終わるまで文字盤を見せない */
+      #terminal .xterm {
+        transition: opacity 0.2s;
+      }
+      #terminal.preparing .xterm {
+        opacity: 0;
+        transition: none;
       }
       .window[hidden] {
         display: none;
@@ -84,13 +137,27 @@
         padding: 0;
         border: 0;
         border-radius: 50%;
-        color: transparent;
-        font: bold 11px/14px system-ui, sans-serif;
+        color: transparent; /* アイコンの色。ふだんは見せず、タイトルバーにポインターが乗ると出す */
         cursor: pointer;
+      }
+      .titlebar button svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        fill: currentColor;
+        stroke: currentColor;
+        stroke-width: 1.4;
+        stroke-linecap: round;
+        pointer-events: none;
+      }
+      /* 押すと元に戻るボタンは、戻す向きのアイコンに替える */
+      .titlebar button[aria-pressed='true'] .off,
+      .titlebar button[aria-pressed='false'] .on {
+        display: none;
       }
       .titlebar:hover button,
       .titlebar button:focus-visible {
-        color: #000a;
+        color: #000b;
       }
       .titlebar button:focus-visible {
         outline: 2px solid #fff;
@@ -180,6 +247,105 @@
       button {
         font: inherit;
       }
+      /* 欄の中の操作部品は macOS のダークモードの部品に寄せる。面は半透明の白、上端に細いハイライト、フォーカスは外側の輪 */
+      #lesson :is(select, .button) {
+        box-sizing: border-box;
+        height: 28px;
+        border: 0;
+        border-radius: 7px;
+        background: #ffffff1f;
+        box-shadow:
+          inset 0 0.5px 0 #ffffff33,
+          0 0 0 0.5px #00000066,
+          0 1px 1.5px #0000004d;
+        color: #e6e6e6;
+        font-size: 13px;
+        line-height: 28px;
+        cursor: default;
+        transition: background 0.1s;
+      }
+      #lesson :is(select, .button):hover {
+        background: #ffffff29;
+      }
+      #lesson :is(select, .button):active {
+        background: #ffffff14;
+      }
+      #lesson :is(select, .button, summary):focus-visible {
+        outline: 3px solid #ffcc0080;
+        outline-offset: 1px;
+      }
+      #lesson .button[hidden] {
+        display: none;
+      }
+      #lesson .button {
+        display: inline-block;
+        padding: 0 14px;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      /* 進むための主なボタンは、アクセントの色で塗る */
+      #lesson .button.primary {
+        background: linear-gradient(#ffd633, #f5c400);
+        box-shadow:
+          inset 0 0.5px 0 #ffffff80,
+          0 0 0 0.5px #00000066,
+          0 1px 1.5px #0000004d;
+        color: #1a1a1a;
+        font-weight: 600;
+      }
+      #lesson .button.primary:hover {
+        background: linear-gradient(#ffdd55, #ffcc00);
+      }
+      #lesson .button.primary:active {
+        background: linear-gradient(#e6b800, #d9ad00);
+      }
+      /* ポップアップボタン。矢印は右端のアクセント色の四角に描く（CSP で data: の画像を使えないので、SVG を重ねる） */
+      .popup {
+        position: relative;
+        flex: none;
+      }
+      .popup select {
+        padding: 0 32px 0 10px;
+        appearance: none;
+        text-overflow: ellipsis;
+      }
+      .popup svg {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 18px;
+        height: 18px;
+        border-radius: 5px;
+        background: linear-gradient(#ffd633, #f5c400);
+        box-shadow: inset 0 0.5px 0 #ffffff80;
+        fill: none;
+        stroke: #1a1a1a;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        pointer-events: none;
+      }
+      #progress {
+        flex: none;
+        height: 6px;
+        overflow: hidden;
+        border: 0;
+        border-radius: 3px;
+        background: #ffffff1f;
+        appearance: none;
+      }
+      #progress::-webkit-progress-bar {
+        background: none;
+      }
+      #progress::-webkit-progress-value {
+        border-radius: 3px;
+        background: #fc0;
+        transition: width 0.3s;
+      }
+      #progress::-moz-progress-bar {
+        border-radius: 3px;
+        background: #fc0;
+      }
       #goal,
       #note {
         color: #a0a0a0;
@@ -254,17 +420,8 @@
         gap: 12px;
         min-height: 32px; /* #next の高さ。#next が消えても手順の欄の高さが変わらないようにする */
       }
-      #next {
-        padding: 2px 16px;
-        font-weight: bold;
-      }
-      #next-lesson {
-        color: #fc0;
-        font-weight: bold;
-      }
       #restart {
         margin-left: auto;
-        font-size: 13px;
       }
       /* 端末は 100 桁で固定なので、欄を横に置けない幅では上に重ね、指示と端末が同時に見えるようにする */
       @media (max-width: 1220px) {
@@ -285,23 +442,34 @@
     <script type="module" src="./lesson-player.js"></script>
   </head>
   <body>
+    <!-- ウィンドウの枠のボタンのアイコン。14×14 のボタンいっぱいに描く -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="icon-close" viewBox="0 0 14 14"><path d="M4.4 4.4l5.2 5.2M9.6 4.4l-5.2 5.2" fill="none" /></symbol>
+      <symbol id="icon-minimize" viewBox="0 0 14 14"><path d="M3.8 7h6.4" fill="none" /></symbol>
+      <symbol id="icon-restore" viewBox="0 0 14 14"><path d="M3.8 7h6.4M7 3.8v6.4" fill="none" /></symbol>
+      <symbol id="icon-expand" viewBox="0 0 14 14"><path d="M4 4h4.4L4 8.4zM10 10H5.6L10 5.6z" stroke="none" /></symbol>
+      <symbol id="icon-shrink" viewBox="0 0 14 14"><path d="M6.5 6.5H2.6l3.9-3.9zM7.5 7.5h3.9l-3.9 3.9z" stroke="none" /></symbol>
+    </svg>
     <main>
       <section id="lesson" class="window" aria-labelledby="course-title">
         <header class="titlebar">
-          <button class="close" aria-label="レッスンの欄を閉じる" title="閉じる">×</button>
-          <button class="minimize" aria-label="レッスンの欄を最小化" aria-pressed="false" title="最小化">−</button>
+          <button class="close" aria-label="レッスンの欄を閉じる" title="閉じる"><svg viewBox="0 0 14 14" aria-hidden="true"><use href="#icon-close" /></svg></button>
+          <button class="minimize" aria-label="レッスンの欄を最小化" aria-pressed="false" title="最小化"><svg viewBox="0 0 14 14" aria-hidden="true"><use class="off" href="#icon-minimize" /><use class="on" href="#icon-restore" /></svg></button>
           <h1 id="course-title" class="title"></h1>
         </header>
         <div class="window-body">
-          <select id="lessons" aria-label="レッスン"></select>
+          <div class="popup">
+            <select id="lessons" aria-label="レッスン"></select>
+            <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M6 7.2l3-3 3 3M6 10.8l3 3 3-3" /></svg>
+          </div>
           <p id="goal"></p>
           <progress id="progress" aria-label="ステップの進み具合"></progress>
           <ol id="steps" aria-live="polite"></ol>
           <p id="status" role="status"></p>
           <p id="actions">
-            <button id="next" hidden>次へ</button>
-            <a id="next-lesson" hidden>次のレッスンへ</a>
-            <button id="restart">このレッスンをやり直す</button>
+            <button id="next" class="button primary" hidden>次へ</button>
+            <a id="next-lesson" class="button primary" hidden>次のレッスンへ</a>
+            <button id="restart" class="button">このレッスンをやり直す</button>
           </p>
           <!-- ふだんは端末の less で開く（lesson-player.js）。できないときは新しいタブで開く。同じタブで開くと VM とレッスンの状態が消える -->
           <p id="note"><kbd>F6</kbd> で端末とこの欄を行き来できます。<a id="license" href="./LICENSE.txt" target="_blank">GPL-3.0-or-later</a><a href="https://github.com/kamataryo/how-to-tmux" target="_blank">ソース</a></p>
@@ -309,9 +477,9 @@
       </section>
       <section id="terminal-window" class="window" aria-labelledby="terminal-title">
         <header class="titlebar">
-          <button class="close" aria-label="端末を閉じる" title="閉じる">×</button>
-          <button class="minimize" aria-label="端末を最小化" aria-pressed="false" title="最小化">−</button>
-          <button class="maximize" aria-label="端末をフルスクリーンにする" aria-pressed="false" title="フルスクリーン">+</button>
+          <button class="close" aria-label="端末を閉じる" title="閉じる"><svg viewBox="0 0 14 14" aria-hidden="true"><use href="#icon-close" /></svg></button>
+          <button class="minimize" aria-label="端末を最小化" aria-pressed="false" title="最小化"><svg viewBox="0 0 14 14" aria-hidden="true"><use class="off" href="#icon-minimize" /><use class="on" href="#icon-restore" /></svg></button>
+          <button class="maximize" aria-label="端末をフルスクリーンにする" aria-pressed="false" title="フルスクリーン"><svg viewBox="0 0 14 14" aria-hidden="true"><use class="off" href="#icon-expand" /><use class="on" href="#icon-shrink" /></svg></button>
           <h2 id="terminal-title" class="title">端末</h2>
         </header>
         <!-- 端末の要素はコースが選ぶので、lesson-player.js がここに加える -->

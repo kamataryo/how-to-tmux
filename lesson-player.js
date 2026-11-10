@@ -10,6 +10,9 @@ const POLL_INTERVAL = 300;
 const KEY_LABELS = { Left: '←', Right: '→', Up: '↑', Down: '↓' };
 const ENV_STOPPED = 99; // course.alive が失敗したときの check の終了コード
 const ENV_STOPPED_MESSAGE = '環境が止まっています。「このレッスンをやり直す」を押してください。';
+const TERMINAL_CLOSED_MESSAGE = '端末を閉じました。「このレッスンをやり直す」を押してください。';
+const ALREADY_PASSED_MESSAGE = 'すでにこの状態になっています。操作を試したら「次へ」を押してください。';
+const HINT_DELAY = 30_000; // この間進まなければ、ヒントを開いて見せる
 const STEP_MOVE = { duration: 500, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' };
 
 const $ = (id) => document.getElementById(id);
@@ -69,7 +72,9 @@ function showStep(step) {
   if (step.hint) item.append(folded('ヒント', ...inline(step.hint)));
   if (step.do) {
     const label = (token) => KEY_LABELS[token] ?? token.replace(/^C-/, 'Ctrl-');
-    item.append(folded('答えを見る', ...step.do.flatMap((token) => [code(label(token)), ' '])));
+    // 長い手順でも区切りがわかるよう、Enter のあとで改行する
+    const breakAfter = (token, index) => (token === 'Enter' && index < step.do.length - 1 ? document.createElement('br') : ' ');
+    item.append(folded('答えを見る', ...step.do.flatMap((token, index) => [code(label(token)), breakAfter(token, index)])));
   }
   moveSteps(() => $('steps').append(item));
   return item;
@@ -105,15 +110,28 @@ function setActiveStep(step) {
 
 const clicked = (button) => new Promise((resolve) => button.addEventListener('click', resolve, { once: true }));
 
+let stoppedMessage = ENV_STOPPED_MESSAGE;
+
 // check を繰り返し実行する。環境が動いているかも同じコマンドで確かめ、止まっている間は画面に表示する。
-// reject は VM が応答しないときで、lesson-agent が再起動すれば次の回に直る
+// reject は VM が応答しないときで、lesson-agent が再起動すれば次の回に直る。
+// 一度も不合格にならずに合格したときは、前の操作で先にその状態になっている。
+// そのまま進めると指示を読む前に次へ移ってしまうので、「次へ」で進めてもらう
 async function passed(check, stale) {
   const command = course.alive ? `${course.alive} || exit ${ENV_STOPPED}; ${check}` : check;
+  let failedOnce = false;
   while (!stale()) {
     const code = await terminal.run(command).catch(() => null);
     if (stale()) return;
-    $('status').textContent = code === null || code === ENV_STOPPED ? ENV_STOPPED_MESSAGE : '';
-    if (code === 0) return;
+    $('status').textContent = code === null || code === ENV_STOPPED ? stoppedMessage : '';
+    if (code === 0) {
+      if (failedOnce) return;
+      $('status').textContent = ALREADY_PASSED_MESSAGE;
+      $('next').hidden = false;
+      await clicked($('next'));
+      if (!stale()) $('status').textContent = '';
+      return;
+    }
+    if (code !== null && code !== ENV_STOPPED) failedOnce = true;
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
   }
 }
@@ -136,6 +154,7 @@ async function play() {
   $('next-lesson').hidden = true;
   $('status').textContent = '準備中…';
 
+  terminal.classList.add('preparing');
   await vmReady;
   if (stale()) return;
   const setup = [course.setup, lesson.setup].filter(Boolean).join(' && ');
@@ -145,16 +164,21 @@ async function play() {
     if (!vmIsFresh) return location.reload();
     console.error(`${lesson.hash} の setup が失敗しました: ${setupCode}`);
     $('status').textContent = 'レッスンを準備できませんでした。';
+    terminal.classList.remove('preparing');
     return;
   }
   vmIsFresh = false;
+  terminal.classList.remove('preparing');
   $('status').textContent = '';
 
   for (const [index, step] of lesson.steps.entries()) {
     setActiveStep(step);
     $('next').hidden = Boolean(step.check);
     const item = showStep(step);
+    // details の 1 つ目がヒント。合格すると markDone() が details ごと消す
+    const nudge = step.hint && step.check && setTimeout(() => item.querySelector('details')?.setAttribute('open', ''), HINT_DELAY);
     await (step.check ? passed(step.check, stale) : clicked($('next')));
+    clearTimeout(nudge);
     if (stale()) return;
     markDone(item);
     $('progress').value = index + 1;
@@ -172,10 +196,11 @@ async function play() {
 
 document.title = course.title;
 $('course-title').textContent = course.title;
+let lessonNumber = 0; // 全体のどこにいるかがわかるよう、通し番号を付ける
 for (const module of course.modules) {
   const group = document.createElement('optgroup');
   group.label = module.title;
-  group.append(...module.lessons.map((lesson) => new Option(lesson.title, hashOf(module, lesson))));
+  group.append(...module.lessons.map((lesson) => new Option(`${++lessonNumber}. ${lesson.title}`, hashOf(module, lesson))));
   $('lessons').append(group);
 }
 
@@ -202,7 +227,7 @@ addEventListener(
     if (event.key === 'F6') {
       event.preventDefault();
       event.stopPropagation();
-      if (terminal.contains(document.activeElement)) ($('next').hidden ? $('lessons') : $('next')).focus();
+      if (terminal.contains(document.activeElement)) ([$('next'), $('next-lesson')].find((element) => !element.hidden) ?? $('lessons')).focus();
       else terminal.focus();
       return;
     }
@@ -228,11 +253,15 @@ for (const win of [lessonWindow, terminalWindow]) {
     win.hidden = true; // 欄の中身は $() で参照し続けるので、DOM からは外さない
     if (win !== terminalWindow) return;
     terminal.remove(); // VM も破棄される
-    $('status').textContent = ENV_STOPPED_MESSAGE;
+    stoppedMessage = TERMINAL_CLOSED_MESSAGE;
+    $('status').textContent = stoppedMessage;
     if (document.fullscreenElement) document.exitFullscreen();
   });
   const minimize = win.querySelector('.minimize');
-  minimize.addEventListener('click', () => minimize.setAttribute('aria-pressed', win.classList.toggle('minimized')));
+  minimize.addEventListener('click', () => {
+    minimize.setAttribute('aria-pressed', win.classList.toggle('minimized'));
+    fitTerminal();
+  });
 }
 
 maximizeTerminal.addEventListener('click', () => {
@@ -250,7 +279,15 @@ $('license').addEventListener('click', async (event) => {
   if (code !== 0) open($('license').href);
 });
 
-const fitTerminal = () => (document.fullscreenElement ? terminal.fit(terminal.clientWidth, terminal.clientHeight) : terminal.fit());
+// フルスクリーンでは画面いっぱいにする。ふだんは元の大きさで、画面に収まらないときだけ文字を小さくして収める
+function fitTerminal() {
+  if (document.fullscreenElement) return terminal.fit(terminal.clientWidth, terminal.clientHeight);
+  terminal.fit();
+  if (!terminal.isConnected || terminalWindow.classList.contains('minimized')) return;
+  const tooTall = document.documentElement.scrollHeight - innerHeight;
+  const tooWide = terminal.scrollWidth - terminal.clientWidth;
+  if (tooTall > 0 || tooWide > 0) terminal.fit(terminal.clientWidth, tooTall > 0 ? terminal.clientHeight - tooTall : Infinity);
+}
 addEventListener('resize', fitTerminal);
 document.addEventListener('fullscreenchange', () => {
   const on = Boolean(document.fullscreenElement);
@@ -280,4 +317,6 @@ lessonBar.addEventListener('pointermove', (event) => {
   });
 });
 
+fitTerminal();
+for (const win of [terminalWindow, lessonWindow]) win.classList.add('open'); // 中身の配置が決まったので見せる
 play();

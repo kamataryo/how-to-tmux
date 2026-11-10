@@ -9,7 +9,7 @@ import { SESSION, STATUS_BAR, clientAttached, clientSession, display, onScreen, 
 const splitRight = display('#{pane_at_left}', 0);
 const splitDown = display('#{pane_at_top}', 0);
 
-const REENTER_COPY_MODE = 'コピーモードを抜けてしまったら、`Ctrl-b` のあと `[` で入り直してください。';
+const REENTER_COPY_MODE = 'コピーモードを抜けてしまったら、`Ctrl-b [` で入り直してください。';
 
 export default {
   id: 'tmux',
@@ -22,7 +22,7 @@ export default {
       steps: [
         {
           id: 'status-bar',
-          say: '下の帯がステータスバーです。左端の `[lesson]` がセッション名、その右の `0:…*` が今いるウィンドウです。',
+          say: '下の帯がステータスバーです。左端の `[lesson]` がセッション名、その右の `0:sh*` が今いるウィンドウです。始める前に、日本語入力をオフにしてください。',
           highlight: STATUS_BAR,
         },
         {
@@ -30,25 +30,25 @@ export default {
           say: 'tmux のショートカットは 2 段階です。`Ctrl-b`（prefix）を押して指を離し、続けて `%` を押すと、画面が左右に分かれます。',
           do: ['C-b', '%'],
           check: splitRight,
-          hint: '`Ctrl-b` と `%` は同時に押しません。日本語入力はオフにしてください。',
+          hint: '`Ctrl-b` と `%` は同時に押しません。`%` は Shift+5 です。',
         },
         {
           id: 'split-down',
-          say: 'カーソルのあるペインが分割の対象です。`Ctrl-b` のあと `"` で、今度は上下に分けましょう。',
+          say: 'カーソルのあるペインが分割の対象です。`Ctrl-b` のあと `"` で、今度は上下に分けましょう。この先は、この押し方を `Ctrl-b "` のように続けて書きます。',
           do: ['C-b', '"'],
           check: splitDown,
           hint: '`"` は JIS 配列なら Shift+2、US 配列なら Shift+\' です。',
         },
         {
           id: 'move-left',
-          say: '`Ctrl-b` のあと `←` で左のペインへ移動します。',
+          say: '`Ctrl-b ←` で左のペインへ移動します。',
           do: ['C-b', 'Left'],
           check: display('#{pane_at_left}', 1),
           highlight: 'active-pane',
         },
         {
           id: 'move-right',
-          say: '`Ctrl-b` のあと `→` で右へ戻ります。',
+          say: '`Ctrl-b →` で右へ戻ります。',
           do: ['C-b', 'Right'],
           check: display('#{pane_at_right}', 1),
           highlight: 'active-pane',
@@ -61,28 +61,29 @@ export default {
         },
         {
           id: 'zoom-in',
-          say: '`Ctrl-b` のあと `z` で、このペインだけを全画面にします。',
+          say: '`Ctrl-b z` で、このペインだけを全画面にします。',
           do: ['C-b', 'z'],
           check: display('#{window_zoomed_flag}', 1),
         },
         {
           id: 'zoom-out',
-          say: 'もう一度 `Ctrl-b` のあと `z` で元に戻します。',
+          say: 'もう一度 `Ctrl-b z` で元に戻します。',
           do: ['C-b', 'z'],
           check: display('#{window_zoomed_flag}', 0),
         },
         {
           id: 'close-with-key',
-          say: '`Ctrl-b` のあと `x` を押すと確認が出るので、`y` で閉じます。',
+          say: '`Ctrl-b x` を押すと確認が出るので、`y` で閉じます。',
           do: ['C-b', 'x', 'y'],
           check: panes(2),
+          hint: 'ペインが 2 つになると次へ進みます。余分に分割していたら、もう一度閉じてください。',
         },
         {
           id: 'close-with-exit',
           say: 'シェルを終えてもペインは閉じます。`exit` を実行してください。',
           do: ['exit', 'Enter'],
           check: panes(1),
-          hint: 'ペインが 1 つだけのときに `exit` すると tmux ごと終わります。そのときは「このレッスンをやり直す」を押してください。',
+          hint: 'ペインが 1 つになると次へ進みます。ペインが 1 つだけのときに `exit` すると tmux ごと終わるので、そのときは「このレッスンをやり直す」を押してください。',
         },
       ],
     },
@@ -93,39 +94,39 @@ export default {
       steps: [
         {
           id: 'new-window',
-          say: 'ウィンドウはブラウザのタブのようなものです。`Ctrl-b` のあと `c` で新しく作ります。ステータスバーに増えたのを確かめましょう。',
+          say: 'ウィンドウはブラウザのタブのようなものです。`Ctrl-b c` で新しく作ります。ステータスバーに増えたのを確かめましょう。',
           do: ['C-b', 'c'],
           check: windows(2),
           highlight: STATUS_BAR,
         },
         {
           id: 'rename',
-          say: '`Ctrl-b` のあと `,` で名前を変えられます。`logs` にしてください。',
+          say: '`Ctrl-b ,` で名前を変えられます。`logs` にしてください。',
           do: ['C-b', ',', 'C-u', 'logs', 'Enter'],
           check: display('#W', 'logs'),
           hint: '今の名前が入っているので、`Ctrl-u` で消してから打ち、`Enter` で確定します。',
         },
         {
           id: 'previous',
-          say: '`Ctrl-b` のあと `p` で前のウィンドウへ移ります。',
+          say: '`Ctrl-b p` で前のウィンドウへ移ります。',
           do: ['C-b', 'p'],
           check: display('#I', 0),
         },
         {
           id: 'next',
-          say: '`Ctrl-b` のあと `n` で次のウィンドウへ移ります。',
+          say: '`Ctrl-b n` で次のウィンドウへ移ります。',
           do: ['C-b', 'n'],
           check: display('#I', 1),
         },
         {
           id: 'by-number',
-          say: '番号でも移れます。`Ctrl-b` のあと `0` で 0 番のウィンドウへ移ります。',
+          say: '番号でも移れます。`Ctrl-b 0` で 0 番のウィンドウへ移ります。',
           do: ['C-b', '0'],
           check: display('#I', 0),
         },
         {
           id: 'open-list',
-          say: '`Ctrl-b` のあと `w` でウィンドウの一覧を開きます。',
+          say: '`Ctrl-b w` でウィンドウの一覧を開きます。',
           do: ['C-b', 'w'],
           check: display('#{pane_mode}', 'tree-mode'),
         },
@@ -137,9 +138,10 @@ export default {
         },
         {
           id: 'close-window',
-          say: '`Ctrl-b` のあと `&` を押すと確認が出るので、`y` でウィンドウごと閉じます。',
+          say: '`Ctrl-b &` を押すと確認が出るので、`y` でウィンドウごと閉じます。',
           do: ['C-b', '&', 'y'],
           check: windows(1),
+          hint: 'ウィンドウが 1 つになると次へ進みます。余分に作っていたら、もう一度閉じてください。',
         },
       ],
     },
@@ -156,13 +158,13 @@ export default {
         },
         {
           id: 'detach',
-          say: '`Ctrl-b` のあと `d` で tmux から離れます（デタッチ）。SSH が切れたときも同じ状態になります。',
+          say: '`Ctrl-b d` で tmux から離れます（デタッチ）。SSH が切れたときも同じ状態になります。',
           do: ['C-b', 'd'],
           check: `! ${clientAttached}`,
         },
         {
           id: 'list-sessions',
-          say: '`tmux ls` を実行してください。離れたあとも、セッションは動き続けています。',
+          say: '`tmux ls` を実行してください。離れたあとも、セッションは動き続けています。確かめたら「次へ」を押します。',
           do: ['tmux ls', 'Enter'],
         },
         {
@@ -185,14 +187,14 @@ export default {
         },
         {
           id: 'choose-session',
-          say: '`Ctrl-b` のあと `s` で一覧を開き、`↓` で `work` を選んで `Enter` で移ります。ステータスバーの左端が変わります。',
+          say: '`Ctrl-b s` で一覧を開き、`↓` で `work` を選んで `Enter` で移ります。ステータスバーの左端が変わります。',
           do: ['C-b', 's', 'Down', 'Enter'],
           check: clientSession('work'),
           highlight: STATUS_BAR,
         },
         {
           id: 'switch-back',
-          say: '`Ctrl-b` のあと `(` で元のセッションへ戻ります。',
+          say: '`Ctrl-b (` で元のセッションへ戻ります。',
           do: ['C-b', '('],
           check: clientSession(SESSION),
           highlight: STATUS_BAR,
@@ -213,7 +215,8 @@ export default {
       steps: [
         {
           id: 'vi-keys',
-          say: 'コピーモードの既定は emacs 流で、コピーは `Ctrl-w` ですが、ブラウザではタブが閉じてしまいます。そこでこのレッスンは vi 流に設定してあります。自分の環境で同じ操作にするには、`~/.tmux.conf` に `setw -g mode-keys vi` と書きます。',
+          say: 'このレッスンでは、コピーモードのキーを vi 流に設定してあります。',
+          hint: '既定は emacs 流で、コピーは `Ctrl-w` ですが、ブラウザではタブが閉じてしまいます。自分の環境で同じ操作にするには、`~/.tmux.conf` に `setw -g mode-keys vi` と書きます。',
         },
         {
           id: 'output',
@@ -223,7 +226,7 @@ export default {
         },
         {
           id: 'enter-copy-mode',
-          say: '先頭は画面の外へ流れました。`Ctrl-b` のあと `[` でコピーモードに入ります。',
+          say: '先頭は画面の外へ流れました。`Ctrl-b [` でコピーモードに入ります。',
           do: ['C-b', '['],
           check: display('#{pane_mode}', 'copy-mode'),
         },
@@ -257,7 +260,7 @@ export default {
         },
         {
           id: 'paste',
-          say: '`echo pasted-` と打ち、実行せずに `Ctrl-b` のあと `]` で貼り付けて、`Enter` を押します。',
+          say: '`echo pasted-` と打ち、実行せずに `Ctrl-b ]` で貼り付けて、`Enter` を押します。',
           do: ['echo pasted-', 'C-b', ']', 'Enter'],
           check: onScreen('^pasted-.'),
         },
@@ -271,13 +274,13 @@ export default {
       steps: [
         {
           id: 'split',
-          say: '`Ctrl-b` のあと `%` で左右に分けます。',
+          say: '`Ctrl-b %` で左右に分けます。',
           do: ['C-b', '%'],
           check: splitRight,
         },
         {
           id: 'sync-on',
-          say: 'ショートカットの実体は tmux のコマンドです。`Ctrl-b` のあと `:` でコマンドを直接打てます。`setw synchronize-panes on` を実行してください。',
+          say: 'ショートカットの実体は tmux のコマンドです。`Ctrl-b :` でコマンドを直接打てます。`setw synchronize-panes on` を実行してください。',
           do: ['C-b', ':', 'setw synchronize-panes on', 'Enter'],
           check: display('#{pane_synchronized}', 1),
         },
@@ -301,20 +304,20 @@ export default {
         },
         {
           id: 'reload-config',
-          say: '`Ctrl-b` のあと `:` で `source-file ~/.tmux.conf` を実行すると、今のセッションに読み込まれます。',
+          say: '`Ctrl-b :` で `source-file ~/.tmux.conf` を実行すると、今のセッションに読み込まれます。',
           do: ['C-b', ':', 'source-file ~/.tmux.conf', 'Enter'],
           check: `[ "$(tmux show -gv mouse)" = on ]`,
         },
         {
           id: 'click',
-          say: 'ペインをクリックすると、そのペインへ移れるようになりました。試してみましょう。',
+          say: 'ペインをクリックすると、そのペインへ移れるようになりました。試したら「次へ」を押します。',
         },
       ],
     },
     {
       id: 'challenge',
       title: '総仕上げ',
-      goal: '指示を見ずに作業環境を組み立てられる',
+      goal: '手順を見ずに作業環境を組み立てられる',
       steps: [
         {
           id: 'build-workspace',
