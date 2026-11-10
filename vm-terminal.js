@@ -17,6 +17,8 @@ const RUN_TIMEOUT = 15_000;
 const PING_TIMEOUT = 2_000;
 const MAX_COLS = 300; // 極端に大きな画面でも、VM の描画が追いつく範囲にとどめる
 const MAX_ROWS = 100;
+const MIN_COLS = 40; // これより狭い画面では、端末をスクロールして見る
+const MIN_ROWS = 10;
 
 export class VmTerminal extends HTMLElement {
   #vm;
@@ -176,16 +178,17 @@ export class VmTerminal extends HTMLElement {
     this.#vm?.serial_send_bytes(0, encoder.encode(data));
   }
 
-  /** 文字盤を width×height（px）に収まる文字の大きさにする。桁数と行数は変えない。引数なしで元の大きさへ戻す。大きくはしない */
-  fit(width, height) {
-    if (!this.isConnected) return;
-    const { options, element } = this.#term;
-    if (!width) {
-      options.fontSize = FONT_SIZE;
-      return;
-    }
-    const screen = element.querySelector('.xterm-screen');
-    options.fontSize = Math.min(FONT_SIZE, Math.floor(options.fontSize * Math.min(width / screen.offsetWidth, height / screen.offsetHeight)));
+  // 1 文字の大きさ（px）。文字の大きさは変えないので、桁数と行数が変わっても同じ
+  #cell() {
+    const screen = this.#term.element.querySelector('.xterm-screen');
+    return { width: screen.offsetWidth / this.#cols, height: screen.offsetHeight / this.#rows };
+  }
+
+  /** 元の桁数と行数のときの文字盤の大きさ（px）。要素を置く前は null */
+  get naturalSize() {
+    if (!this.isConnected) return null;
+    const cell = this.#cell();
+    return { width: cell.width * COLS, height: cell.height * ROWS };
   }
 
   /** 今の桁数と行数。fill() で変わる */
@@ -198,7 +201,7 @@ export class VmTerminal extends HTMLElement {
   }
 
   /**
-   * 文字の大きさを変えずに、width×height（px）に収まる桁数と行数にする。引数なしで元の桁数と行数へ戻す。
+   * 文字の大きさを変えずに、width×height（px）に収まる桁数と行数にする。元より少なくも多くもなる。引数なしで元の桁数と行数へ戻す。
    * VM の端末にも同じ大きさを伝えるので、中で動いているプログラムは端末の大きさが変わったときと同じように描き直す。
    * VM の起動前は何もしない
    */
@@ -206,9 +209,10 @@ export class VmTerminal extends HTMLElement {
     if (!this.#ready) return;
     let [cols, rows] = [COLS, ROWS];
     if (width) {
-      const screen = this.#term.element.querySelector('.xterm-screen');
-      cols = Math.max(COLS, Math.min(MAX_COLS, Math.floor(width / (screen.offsetWidth / this.#cols))));
-      rows = Math.max(ROWS, Math.min(MAX_ROWS, Math.floor(height / (screen.offsetHeight / this.#rows))));
+      // 文字盤の大きさは整数に丸められているので、ちょうど収まる大きさで 1 つ減らさないよう少し余裕を見る
+      const cell = this.#cell();
+      cols = Math.max(MIN_COLS, Math.min(MAX_COLS, Math.floor((width + 0.5) / cell.width)));
+      rows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, Math.floor((height + 0.5) / cell.height)));
     }
     if (cols === this.#cols && rows === this.#rows) return;
     [this.#cols, this.#rows] = [cols, rows];

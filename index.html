@@ -425,8 +425,12 @@
       li.done .figure span {
         display: inline;
       }
+      /* 図は欄の幅いっぱいにあり、外側に描くと #steps の overflow で切れるので、枠は内側に描く */
       .figure:focus-visible {
         outline: 3px solid #ffcc0080;
+        outline-offset: -3px;
+      }
+      li.done .figure:focus-visible {
         outline-offset: 1px;
       }
       #figure-viewer {
@@ -486,7 +490,7 @@
       #restart {
         margin-left: auto;
       }
-      /* 端末は 100 桁で固定なので、欄を横に置けない幅では上に重ね、指示と端末が同時に見えるようにする */
+      /* 端末は 100 桁あるので、欄を横に置けない幅では上に重ね、指示と端末が同時に見えるようにする。それでも収まらなければ桁数と行数を減らす */
       @media (max-width: 1220px) {
         main {
           grid-template-columns: minmax(0, 1fr);
@@ -510,6 +514,9 @@
         }
         .figure span {
           display: inline;
+        }
+        .figure:focus-visible {
+          outline-offset: 1px;
         }
         #terminal-window {
           grid-area: auto;

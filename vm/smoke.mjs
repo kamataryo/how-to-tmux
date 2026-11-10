@@ -376,6 +376,17 @@ try {
   const lessonRestored = await rectOf('#lesson');
   assert.deepEqual([lessonRestored.left, lessonRestored.top], [lessonRect.left, lessonRect.top], 'ドラッグした位置が残っています');
 
+  // 狭い画面でも文字の大きさはそのままで、桁数と行数が減って収まる。VM の端末も同じ大きさになる
+  await page('Emulation.setDeviceMetricsOverride', { width: 600, height: 500, deviceScaleFactor: 0, mobile: false });
+  await waitUntil('桁数と行数の縮小', async () => { const { cols, rows } = await gridSize(); return cols < normalGrid.cols && rows < normalGrid.rows; });
+  const narrowGrid = await gridSize();
+  assert.equal(await fontSize(), 14, '狭い画面で文字の大きさが変わりました');
+  await waitUntil('VM の端末の大きさの縮小', () => clientIs(narrowGrid));
+  assert.ok(await evaluate(`document.documentElement.scrollHeight <= innerHeight && tmux.scrollWidth <= tmux.clientWidth`), '狭い画面に収まっていません');
+  await page('Emulation.clearDeviceMetricsOverride');
+  await waitUntil('桁数と行数の復帰', async () => JSON.stringify(await gridSize()) === JSON.stringify(normalGrid));
+  await waitUntil('VM の端末の大きさの復帰', () => clientIs(normalGrid));
+
   // 欄を消してもレッスンは進み続ける
   await clickOn('#lesson .minimize');
   assert.equal((await rectOf('#lesson')).height, (await rectOf('#lesson .titlebar')).height + 2, '欄を最小化できません');
