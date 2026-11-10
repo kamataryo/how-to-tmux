@@ -139,7 +139,7 @@
         grid-area: 1 / 1;
         background: #000;
       }
-      tmux-terminal {
+      #terminal {
         display: block;
         overflow: auto;
       }
@@ -151,7 +151,7 @@
         border: 0;
         border-radius: 0;
       }
-      :fullscreen tmux-terminal {
+      :fullscreen #terminal {
         display: grid;
         flex: 1;
         place-content: center;
@@ -314,7 +314,7 @@
           <button class="maximize" aria-label="端末をフルスクリーンにする" aria-pressed="false" title="フルスクリーン">+</button>
           <h2 id="terminal-title" class="title">端末</h2>
         </header>
-        <tmux-terminal></tmux-terminal>
+        <!-- 端末の要素はコースが選ぶので、lesson-player.js がここに加える -->
       </section>
     </main>
   </body>

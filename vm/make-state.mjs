@@ -1,4 +1,4 @@
-// Node で VM を起動し、tmux の中のプロンプトまで進めた状態を保存する。ページはこの状態から復元する。
+// Node で VM を起動し、コースの最初の画面（course.vm.boot を打った後）まで進めた状態を保存する。ページはこの状態から復元する。
 // 使い方: node make-state.mjs <site の絶対パス> <fs.json の絶対パス>
 
 import { execFileSync } from 'node:child_process';
@@ -7,24 +7,17 @@ import path from 'node:path';
 
 const [site, fsJson] = process.argv.slice(2);
 const { V86 } = await import(path.join(site, 'v86/libv86.mjs'));
+const { default: course } = await import(path.join(site, 'course.mjs'));
+const { STATE_FILE, vmOptions } = await import('../vm-config.js');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const options = vmOptions(`${site}/`);
 const emulator = new V86({
-  wasm_path: path.join(site, 'v86/v86.wasm'),
-  bios: { url: path.join(site, 'bios/seabios.bin') },
-  vga_bios: { url: path.join(site, 'bios/vgabios.bin') },
-  autostart: true,
-  // 実際の使用量は 15 MB 程度。ローダーが initrd を 64 MiB の位置に置くので 64 MiB 以下では起動できない
-  memory_size: 128 * 1024 * 1024,
-  vga_memory_size: 2 * 1024 * 1024,
-  uart1: true,
+  ...options,
   bzimage_initrd_from_filesystem: true,
   // ignoreqv: v86 のファイルは qid.version が 0 で、Linux はそれをキャッシュしない印として扱う。付けないとコマンドを起動するたびに HTTP で取り直す
   cmdline: 'rw root=host9p rootfstype=9p rootflags=trans=virtio,cache=loose,ignoreqv modules=virtio_pci tsc=reliable init_on_free=on',
-  filesystem: {
-    baseurl: path.join(site, 'images/rootfs-flat'),
-    basefs: fsJson,
-  },
+  filesystem: { ...options.filesystem, basefs: fsJson },
 });
 
 let screen = '';
@@ -43,18 +36,20 @@ async function waitFor(pattern, what) {
 
 // BusyBox の ash はプロンプトの直後にカーソル位置の問い合わせを送る
 await waitFor(/localhost:~# (\x1b\[6n)?$/, 'ログイン');
-emulator.serial0_send('tmux new -s lesson\n');
-await waitFor(/\[lesson\]/, 'tmux 起動');
+if (course.vm?.boot) {
+  emulator.serial0_send(`${course.vm.boot}\n`);
+  await waitFor(new RegExp(course.vm.booted), `${course.vm.boot} の起動`);
+}
 
 // 空きページを 0 にして圧縮を効かせる。実行中のプロセスのページは残る。
-// .tmux.conf にエラーがあると tmux はエラー表示を開き、ここで打った文字はシェルに届かない。
+// boot がシェルに戻らないと（.tmux.conf にエラーがあると tmux はエラー表示を開く）、ここで打った文字はシェルに届かない。
 // そのまま保存すると壊れた状態を配ることになるので、シェルが応答しなければビルドを失敗させる
 // （打った文字列そのものに一致しないよう、結果は計算させる）
 emulator.serial0_send('sync; echo 3 >/proc/sys/vm/drop_caches; echo shell-ok-$((6*7)); clear\n');
 await waitFor(/shell-ok-42/, 'シェルの応答');
 await sleep(10_000);
 
-const file = path.join(site, 'images/state.bin');
+const file = path.join(site, STATE_FILE.replace(/\.zst$/, ''));
 writeFileSync(file, new Uint8Array(await emulator.save_state()));
 execFileSync('zstd', ['-19', '-f', '--rm', '-q', file]);
 console.log(`保存: ${file}.zst`);

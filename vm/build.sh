@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# 配信物を $OUT/site に作る。Docker と Node、zstd が必要。
-# 使い方: vm/build.sh（既定の出力先は dist）/ OUT=/path/to/out vm/build.sh
+# コースの配信物を $OUT/site に作る。Docker と Node、zstd が必要。
+# 使い方: vm/build.sh [コース]（既定のコースは linux、出力先は dist）/ OUT=/path/to/out vm/build.sh linux
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(dirname "$HERE")
 OUT=${OUT:-$ROOT/dist}
-NAME=v86-how-to-tmux
+COURSE=${1:-linux}
+[ -f "$ROOT/courses/$COURSE/vm/Dockerfile" ] || { echo "courses/$COURSE/vm/Dockerfile がありません" >&2; exit 1; }
+BASE=v86-lesson-base
+NAME=v86-lesson-$COURSE
 
 # どれも公開から 1 か月以上たった版に固定する。コミットは v86 0.5.470 の公開直前のもの。
 # V86_COMMIT を変えたら LICENSE.txt の SeaBIOS の版とリンクも直す
@@ -29,7 +32,10 @@ tar xzf "$WORK/xterm.tgz" -C "$SITE/xterm" --strip-components=2 package/lib/xter
 for f in tools/fs2json.py tools/copy-to-sha256.py; do curl -fsS -o "$WORK/$f" "$RAW/$f"; done
 for f in bios/seabios.bin bios/vgabios.bin; do curl -fsS -o "$SITE/$f" "$RAW/$f"; done
 
-docker build "$HERE" --platform linux/386 --rm --tag "$NAME"
+# 共通部分の上にコースの中身を重ねる。端末サイズは vm-config.js の値を渡す
+SIZE=$(node -e 'import(process.argv[1]).then((c) => console.log(`--build-arg COLS=${c.COLS} --build-arg ROWS=${c.ROWS}`))' "$ROOT/vm-config.js")
+docker build "$HERE" --platform linux/386 --rm $SIZE --tag "$BASE"
+docker build "$ROOT/courses/$COURSE/vm" --platform linux/386 --rm --build-arg "BASE=$BASE" --tag "$NAME"
 # LICENSE.txt のソース提供の申し出が対象とする版の一覧。apk add は版を固定していないので、ビルドごとに書き出す
 docker run --rm --platform linux/386 "$NAME" apk list -I >"$SITE/packages.txt"
 docker rm "$NAME" 2>/dev/null || true
@@ -47,8 +53,10 @@ docker run --rm -v "$WORK:/work" -v "$SITE/images:/images" python:3.14-alpine sh
   python -I /work/tools/copy-to-sha256.py --zstd /work/rootfs.tar /images/rootfs-flat
 ' 2>&1 | tail -3
 
-node "$HERE/make-state.mjs" "$SITE" "$WORK/fs.json"
 # 編集がそのまま反映されるようリンクにする。公開するときは cp -RL で実体にする
-ln -s "$ROOT/index.html" "$ROOT/tmux-terminal.js" "$ROOT/lesson-player.js" "$ROOT/courses" "$ROOT/LICENSE.txt" "$SITE/"
+ln -s "$ROOT/index.html" "$ROOT"/*.js "$ROOT/courses" "$ROOT/LICENSE.txt" "$SITE/"
+# ページとテストは、このファイルでどのコースの配信物かを知る
+echo "export { default } from './courses/$COURSE/index.js';" >"$SITE/course.mjs"
+node "$HERE/make-state.mjs" "$SITE" "$WORK/fs.json"
 "$HERE/render-images.sh" "$SITE"
 echo "完了: $SITE"
