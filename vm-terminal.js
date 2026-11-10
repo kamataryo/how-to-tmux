@@ -27,7 +27,9 @@ export class VmTerminal extends HTMLElement {
   connectedCallback() {
     const progress = document.createElement('progress');
     progress.setAttribute('aria-label', '環境を読み込み中');
-    progress.style.width = '100%';
+    // 文字盤の上端に重ねる。場所を取らせると、出たり消えたりするたびに端末が上下に動く
+    this.style.position = 'relative';
+    Object.assign(progress.style, { position: 'absolute', top: 0, left: 0, zIndex: 20, width: '100%' });
     this.replaceChildren(progress);
 
     // VM の出力でリンクを開かせない（講座にはリンクは要らず、偽リンクの踏み台にもなる）

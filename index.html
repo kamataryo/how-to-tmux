@@ -26,9 +26,18 @@
         color-scheme: dark;
         accent-color: #fc0;
       }
+      /* 背景は壁紙のように、暗い地に色の光をぼかして重ねる。色は tmux のステータスバーの緑とアクセントの黄、奥行きを出す青と紫 */
+      html {
+        background:
+          radial-gradient(90vmax 70vmax at 10% 5%, #2f6b3f8c, transparent 60%),
+          radial-gradient(80vmax 60vmax at 98% 12%, #6b55188c, transparent 62%),
+          radial-gradient(100vmax 80vmax at 72% 108%, #1e3f7a99, transparent 60%),
+          radial-gradient(70vmax 60vmax at -5% 100%, #47307080, transparent 60%),
+          #101216;
+        background-attachment: fixed;
+      }
       body {
         margin: 0;
-        background: #1a1c22;
         color: #d0d0d0;
         font: 15px/1.6 system-ui, sans-serif;
       }
@@ -47,10 +56,54 @@
         box-sizing: border-box;
         max-width: 100%;
         overflow: hidden;
-        border: 1px solid #4a4a4f;
+        /* macOS のウィンドウの枠と影に寄せる。公式の数値はないので、実物のスクリーンショットから広く使われている近似値。
+           枠は内側の明るい線と外側の黒い細線、影は操作中のウィンドウだけ大きくする */
+        border: 1px solid #ffffff26;
         border-radius: 10px;
         background: #1e1e1e;
-        box-shadow: 0 18px 50px #000a;
+        box-shadow:
+          0 0 0 0.5px #000000cc,
+          0 10px 30px #0000004d;
+        opacity: 0; /* 中身の配置が決まるまで見せない（lesson-player.js が open を付ける） */
+        transition: box-shadow 0.2s;
+      }
+      .window:focus-within {
+        box-shadow:
+          0 0 0 0.5px #000000cc,
+          0 22px 70px 4px #0000008f;
+      }
+      .window:not(:focus-within) .title {
+        color: #8e8e93;
+      }
+      /* 開くときは少し小さいところから、わずかに行き過ぎて止まる。欄は端末に少し遅れて開く */
+      .window.open {
+        opacity: 1;
+        animation: window-open 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.25) backwards;
+      }
+      #lesson.open {
+        animation-delay: 0.09s;
+      }
+      @keyframes window-open {
+        from {
+          opacity: 0;
+          scale: 0.9;
+        }
+        60% {
+          opacity: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .window.open {
+          animation: none;
+        }
+      }
+      /* レッスンの準備で画面が何度か書き換わるので、終わるまで文字盤を見せない */
+      #terminal .xterm {
+        transition: opacity 0.2s;
+      }
+      #terminal.preparing .xterm {
+        opacity: 0;
+        transition: none;
       }
       .window[hidden] {
         display: none;

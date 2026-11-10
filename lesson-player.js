@@ -154,6 +154,7 @@ async function play() {
   $('next-lesson').hidden = true;
   $('status').textContent = '準備中…';
 
+  terminal.classList.add('preparing');
   await vmReady;
   if (stale()) return;
   const setup = [course.setup, lesson.setup].filter(Boolean).join(' && ');
@@ -163,9 +164,11 @@ async function play() {
     if (!vmIsFresh) return location.reload();
     console.error(`${lesson.hash} の setup が失敗しました: ${setupCode}`);
     $('status').textContent = 'レッスンを準備できませんでした。';
+    terminal.classList.remove('preparing');
     return;
   }
   vmIsFresh = false;
+  terminal.classList.remove('preparing');
   $('status').textContent = '';
 
   for (const [index, step] of lesson.steps.entries()) {
@@ -315,4 +318,5 @@ lessonBar.addEventListener('pointermove', (event) => {
 });
 
 fitTerminal();
+for (const win of [terminalWindow, lessonWindow]) win.classList.add('open'); // 中身の配置が決まったので見せる
 play();
