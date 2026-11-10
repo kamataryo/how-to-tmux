@@ -1,10 +1,10 @@
-// シナリオを読み込み、<tmux-terminal> の上でレッスンを進める。シナリオの形は courses/linux/index.js を参照。
+// シナリオを読み込み、端末の上でレッスンを進める。シナリオの形は courses/linux/index.js を参照。
+// どのコースを進めるかはビルドで決まる（vm/build.sh が course.mjs を作る）。端末の要素もコースが選ぶ。
 //
 // VM の作り直しはページの再読み込みに任せる。レッスンの位置は URL のハッシュに持つので、再読み込みしても同じレッスンに戻る。
 // 進捗は保存しない（VM の状態が残らないので、途中のステップには戻れない）。
 
-import './tmux-terminal.js';
-import course from './courses/linux/index.js';
+import course from './course.mjs';
 
 const POLL_INTERVAL = 300;
 const KEY_LABELS = { Left: '←', Right: '→', Up: '↑', Down: '↓' };
@@ -13,10 +13,16 @@ const ENV_STOPPED_MESSAGE = '環境が止まっています。「このレッス
 const STEP_MOVE = { duration: 500, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' };
 
 const $ = (id) => document.getElementById(id);
-const terminal = document.querySelector('tmux-terminal');
+
+// 端末はコースが選んだ要素（<vm-terminal> か、それを拡張したもの）で、要素名と同じ名前のファイルが定義する
+const terminalTag = course.terminal ?? 'vm-terminal';
+await import(`./${terminalTag}.js`);
+const terminal = Object.assign(document.createElement(terminalTag), { id: 'terminal' });
+$('terminal-window').append(terminal);
+
 const hashOf = (module, lesson) => `#${module.id}/${lesson.id}`;
 const lessons = course.modules.flatMap((module) => module.lessons.map((lesson) => ({ ...lesson, hash: hashOf(module, lesson) })));
-const vmStarted = new Promise((resolve) => terminal.addEventListener('tmux-layout', resolve, { once: true }));
+const vmReady = new Promise((resolve) => terminal.addEventListener('vm-ready', resolve, { once: true }));
 
 const code = (text) => {
   const element = document.createElement('code');
@@ -85,7 +91,7 @@ function drawHighlight() {
   box = null;
   const target = activeStep?.highlight;
   if (target === 'active-pane') {
-    const pane = terminal.layout?.panes.find((p) => p.active);
+    const pane = terminal.layout?.panes.find((p) => p.active); // layout があるのは <tmux-terminal> だけ
     if (pane) box = terminal.highlight(pane.col, pane.row, pane.width, pane.height);
   } else if (target) {
     box = terminal.highlight(...target);
@@ -130,7 +136,7 @@ async function play() {
   $('next-lesson').hidden = true;
   $('status').textContent = '準備中…';
 
-  await vmStarted;
+  await vmReady;
   if (stale()) return;
   const setup = [course.setup, lesson.setup].filter(Boolean).join(' && ');
   const setupCode = setup ? await terminal.run(setup).catch(() => null) : 0;
@@ -240,7 +246,7 @@ maximizeTerminal.addEventListener('click', () => {
 $('license').addEventListener('click', async (event) => {
   event.preventDefault();
   if (terminalWindow.classList.contains('minimized')) minimizeTerminal.click();
-  const code = await terminal.run(course.license).catch(() => null);
+  const code = course.license ? await terminal.run(course.license).catch(() => null) : null;
   if (code !== 0) open($('license').href);
 });
 

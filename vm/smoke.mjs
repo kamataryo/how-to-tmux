@@ -6,13 +6,13 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import course from '../courses/linux/index.js';
 
 const site = process.argv[2] ?? 'dist/site';
 const chromePath = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 8799;
 const origin = `http://127.0.0.1:${PORT}`;
 assert.ok(existsSync(path.join(site, 'images/state.bin.zst')), `${site} に配信物がありません。先に vm/build.sh を実行してください`);
+const { default: course } = await import(path.resolve(site, 'course.mjs')); // 配信物のコース
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const server = spawn('python3', ['-I', '-m', 'http.server', String(PORT), '--bind', '127.0.0.1', '-d', site], { stdio: 'ignore' });
@@ -79,6 +79,7 @@ try {
   await waitUntil('最初のレッスンの準備', async () => (await currentStep()) === firstStep.id);
   await evaluate(`window.hooks = []; addEventListener('tmux-hook', (e) => hooks.push(e.detail)); window.tmux = document.querySelector('tmux-terminal'); tmux.focus();`);
   await waitUntil('起動時の配置', () => evaluate(`tmux.layout?.panes.length === 1`));
+  assert.equal(await evaluate(`tmux.ready`), true, 'レッスンが始まっているのに ready が false です');
   await waitUntil('setup で番号を振り直した後のウィンドウ番号', () => evaluate(`tmux.layout.window === 0`));
 
   // アイコンと OGP 画像が配信物にあり、CSP で読める
@@ -209,7 +210,7 @@ try {
       return steps.getBoundingClientRect().bottom - steps.querySelector('[aria-current]').getBoundingClientRect().bottom;
     })`);
     assert.ok(Math.abs(gap) < 1, `${where}: 進行中のステップが下端にありません: ${gap}`);
-    assert.equal(await evaluate(`document.querySelector('.tmux-highlights').childElementCount`), step.highlight ? 1 : 0, `${where}: ハイライトの数が違います`);
+    assert.equal(await evaluate(`document.querySelector('.terminal-highlights').childElementCount`), step.highlight ? 1 : 0, `${where}: ハイライトの数が違います`);
     if (step.check) assert.notEqual(await run(step.check), 0, `${where}: do の前から合格しています`);
     for (const [index, token] of (step.do ?? []).entries()) {
       await pressToken(token);

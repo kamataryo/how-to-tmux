@@ -3,7 +3,7 @@
 // ブラウザと OS に奪われるキーを教えない。
 // Ctrl-w はタブを閉じ、Ctrl-Space は macOS の入力切替と衝突し、Option は xterm.js の既定では Meta にならない。
 
-import { STATUS_BAR, clientAttached, clientSession, display, onScreen, panes, running, windows } from './common.js';
+import { SESSION, STATUS_BAR, clientAttached, clientSession, display, onScreen, panes, running, windows } from './tmux-common.js';
 
 // ペインの数ではなく方向で判定する。逆方向に分割して合格すると、その後の移動のステップが成り立たない
 const splitRight = display('#{pane_at_left}', 0);
@@ -194,7 +194,7 @@ export default {
           id: 'switch-back',
           say: '`Ctrl-b` のあと `(` で元のセッションへ戻ります。',
           do: ['C-b', '('],
-          check: clientSession('lesson'),
+          check: clientSession(SESSION),
           highlight: STATUS_BAR,
         },
         {

@@ -8,7 +8,27 @@ Docker、Node.js、zstd、Python 3 が必要です。
 vm/build.sh  # dist/site に配信物を作る（2 分ほど）
 python3 vm/serve.py
 open http://127.0.0.1:8000/
+npm test     # 配信物をヘッドレス Chrome で開き、全ステップを通す
 ```
+
+## 構成
+
+配信物は 1 つのコースと、そのコースの VM でできています。`vm/build.sh [コース]` がコースを選び（既定は `linux`）、ページとテストは配信物の `course.mjs` でどのコースかを知ります。
+
+| 場所 | 内容 | tmux に依存するか |
+|---|---|---|
+| `vm-terminal.js` | `<vm-terminal>`。VM のシリアル端末の表示と `run()` | しない |
+| `tmux-terminal.js` | `<tmux-terminal>`。`<vm-terminal>` に tmux の通知を加えたもの | する |
+| `lesson-player.js` | シナリオを進める | しない（`highlight: 'active-pane'` だけは `<tmux-terminal>` が要る） |
+| `vm-config.js` | 端末の桁数と行数、v86 の設定。ページとビルドの両方が読む | しない |
+| `vm/` | どのコースにも共通の VM（`Dockerfile`）とビルド | しない |
+| `courses/<コース>/` | シナリオと、そのコースの VM に入れるもの（`vm/Dockerfile`） | コースによる |
+
+### コースを増やす
+
+1. `courses/<コース>/vm/Dockerfile` を作ります。`ARG BASE` と `FROM $BASE` で始め、共通の VM に入れたいものを加えます。
+2. `courses/<コース>/index.js` にシナリオを書きます。素のシェルで始めるなら `terminal` と `vm` は要りません。tmux の中で始めるなら `courses/linux/index.js` と同じ値を書きます。
+3. `vm/build.sh <コース>` でビルドします。
 
 ## シナリオを書く
 
@@ -20,8 +40,8 @@ open http://127.0.0.1:8000/
 |---|---|
 | レッスン開始時の初期化と、できないときの VM の作り直し | `courses/linux/index.js` の `setup` |
 | 環境が止まったときの表示 | `courses/linux/index.js` の `alive` |
-| 判定の部品（`onScreen()`、`running()` など） | `courses/linux/common.js` |
-| 全ステップの自動テスト | `pnpm test`（`do` を打って通す） |
+| 判定の部品（`onScreen()`、`running()` など）。tmux の中で動くレッスン用 | `courses/linux/tmux-common.js` |
+| 全ステップの自動テスト | `npm test`（`do` を打って通す） |
 
 ```js
 {
@@ -33,29 +53,35 @@ open http://127.0.0.1:8000/
 ```
 
 - **状態が変わらないコマンドの判定:** `ls` などは `onScreen()` で画面の内容を見ます。
-- **`do` を必ず書く:** `pnpm test` が `do` を打って全ステップを通します。`check` が `do` を打ち終える前に成功するステップは失敗にします。指示を読み終える前に進んでしまうためです。
+- **`do` を必ず書く:** `npm test` が `do` を打って全ステップを通します。`check` が `do` を打ち終える前に成功するステップは失敗にします。指示を読み終える前に進んでしまうためです。
 - **`check` は間違えた後でも正解できるように書く:** 操作の回数やペインの数ではなく、目的の状態を判定します。回数に頼ると、やり直しても合格できなくなります。
 - **`setup` はやり直せるように書く:** 0 以外で終わると、ページを再読み込みして VM を作り直してからもう一度実行します。
 - **ブラウザと OS に奪われるキーを教えない:** `Ctrl-w` はタブを閉じ、`Ctrl-Space` は macOS の入力切替と衝突し、Option は xterm.js の既定では Meta になりません。
 
-## `<tmux-terminal>` の使い方
+## `<vm-terminal>` と `<tmux-terminal>` の使い方
 
 ```html
 <script type="module" src="./tmux-terminal.js"></script>
 <tmux-terminal></tmux-terminal>
 ```
 
-要素を置くと VM を読み込み、読み込み中は進捗バーを表示します。端末は 100×30 桁の固定です。要素を外すと VM を破棄し、付け直すと最初の状態から始まります。
+要素を置くと VM を読み込み、読み込み中は進捗バーを表示します。端末は 100×30 桁の固定です（`vm-config.js`）。要素を外すと VM を破棄し、付け直すと最初の状態から始まります。
+
+`<vm-terminal>` は VM の中で何が動いているかを知りません。`<tmux-terminal>` はそれを拡張し、tmux のフックからの通知を加えます。下の表で「tmux」とあるものは `<tmux-terminal>` だけにあります。
 
 | 名前 | 種類 | 内容 |
 |---|---|---|
 | `highlight(col, row, width, height)` | メソッド | 画面に矩形を重ねて描き、その要素を返す |
-| `layout` | プロパティ | 最新のペインの配置。最初の通知までは `null` |
+| `ready` | プロパティ | `run()` を使えるか。VM が動き出して `lesson-agent` が応答すると `true` |
+| `vm-ready` | イベント | `ready` が `true` になった |
+| `send(data)` | メソッド | 利用者が打ったのと同じように、端末へ文字を送る |
+| `vm-line` | イベント | VM が `/dev/ttyS1` に書いた行。`detail` はその行。`<tmux-terminal>` では出ず、下の 2 つのイベントになる |
+| `layout` | プロパティ | tmux。最新のペインの配置。最初の通知までは `null` |
 | `focus()` | メソッド | キー入力を端末へ向ける |
 | `fit(width, height)` | メソッド | 文字盤が指定の大きさ（px）に収まるよう文字の大きさを変える。桁数と行数は変わらない。引数なしで元に戻す |
 | `run(command)` | メソッド | VM でシェルコマンドを実行し、終了コードの Promise を返す |
-| `tmux-layout` | イベント | ペインの配置が変わった。`detail` は `layout` と同じ形 |
-| `tmux-hook` | イベント | tmux の操作の通知。`detail` は `split-window` か `new-window` |
+| `tmux-layout` | イベント | tmux。ペインの配置が変わった。`detail` は `layout` と同じ形 |
+| `tmux-hook` | イベント | tmux。tmux の操作の通知。`detail` は `split-window` か `new-window` |
 
 ### 画面の一部をハイライトする
 
@@ -132,7 +158,7 @@ addEventListener('keydown', (event) => {
 const code = await terminal.run('[ $(tmux list-panes | wc -l) -eq 2 ]');
 ```
 
-- `layout` が `null` のあいだは VM の起動前なので、呼ぶと reject します。
+- `ready` が `false` のあいだは VM の起動前なので、呼ぶと reject します。`vm-ready` を待ってから呼びます。
 - root として `/root` で実行します。標準入力は空で、出力は捨てられます。
 - コマンドは 1 行だけで、複数を同時に呼ぶと順番に実行します。
 - 10 秒で打ち切り、終了コードは 143 になります。
@@ -140,6 +166,6 @@ const code = await terminal.run('[ $(tmux list-panes | wc -l) -eq 2 ]');
 
 ## レッスンを書くときの注意
 
-- **スクリプトは別ファイルにする:** CSP によりインラインスクリプトは動きません。同一オリジンの `.js` ファイルにして、`vm/build.sh` の最後の `ln -s` に追加してください。
+- **スクリプトは別ファイルにする:** CSP によりインラインスクリプトは動きません。同一オリジンの `.js` ファイルにしてください。リポジトリの直下に置いた `.js` は `vm/build.sh` が配信物に加えます。
 - **VM からの値を信頼しない:** 利用者は VM の root なので、`echo 'layout …' >/dev/ttyS1` などで通知を偽装できます。`detail` を `innerHTML` に入れず、合否の判定を権限や認定に使わないでください。形式の合わない `layout` の行は捨てられます。
 - **VM の時計は保存時刻のまま:** ビルド時の状態を復元するので、VM の中の時刻は正しくありません。ステータスバーの時刻は消してあります。
