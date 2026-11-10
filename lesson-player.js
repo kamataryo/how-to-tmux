@@ -300,7 +300,8 @@ for (const win of [lessonWindow, terminalWindow]) {
 maximizeTerminal.addEventListener('click', () => {
   if (document.fullscreenElement) return document.exitFullscreen();
   if (terminalWindow.classList.contains('minimized')) minimizeTerminal.click();
-  navigator.keyboard?.lock(['Escape']); // Esc をコピーモードで使えるようにする。対応ブラウザでは Esc の長押しで解除する
+  // Esc をコピーモードで使えるようにする。対応ブラウザでは Esc の長押しで解除する。できない環境では reject するが、フルスクリーンには影響しない
+  navigator.keyboard?.lock(['Escape']).catch(() => {});
   document.documentElement.requestFullscreen();
 });
 
