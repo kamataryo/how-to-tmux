@@ -211,6 +211,7 @@ try {
     })`);
     assert.ok(Math.abs(gap) < 1, `${where}: 進行中のステップが下端にありません: ${gap}`);
     assert.equal(await evaluate(`document.querySelector('.terminal-highlights').childElementCount`), step.highlight ? 1 : 0, `${where}: ハイライトの数が違います`);
+    if (step.figure) await waitUntil(`${where} の図`, () => evaluate(`document.querySelector('[aria-current="step"] .figure img')?.naturalWidth > 0`));
     if (step.check) assert.notEqual(await run(step.check), 0, `${where}: do の前から合格しています`);
     for (const [index, token] of (step.do ?? []).entries()) {
       await pressToken(token);

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 200" font-family="system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif" font-size="12">
+  <title>prefix の押し方。Ctrl と b を同時に押して離し、続けて次のキーを押す</title>
+  <text x="20" y="28" fill="#d8d8d8" font-weight="600">tmux のショートカットは 2 段階</text>
+  <rect x="28" y="70" width="64" height="40" rx="7" fill="#2a2a2c" stroke="#5a5a5e" stroke-width="1.5" />
+  <rect x="28" y="70" width="64" height="36" rx="7" fill="#3a3a3c" stroke="#5a5a5e" stroke-width="1.5" />
+  <text x="60.0" y="93" fill="#d8d8d8" font-size="14" text-anchor="middle" font-family="Menlo, Consolas, monospace">Ctrl</text>
+  <text x="104" y="95" fill="#8e8e93" font-size="14" text-anchor="middle">+</text>
+  <rect x="116" y="70" width="44" height="40" rx="7" fill="#2a2a2c" stroke="#5a5a5e" stroke-width="1.5" />
+  <rect x="116" y="70" width="44" height="36" rx="7" fill="#3a3a3c" stroke="#5a5a5e" stroke-width="1.5" />
+  <text x="138.0" y="93" fill="#d8d8d8" font-size="14" text-anchor="middle" font-family="Menlo, Consolas, monospace">b</text>
+  <path d="M184 90h72m-8-6l8 6-8 6" fill="none" stroke="#ffcc00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="220" y="80" fill="#ffcc00" font-size="11" text-anchor="middle">指を離す</text>
+  <rect x="282" y="70" width="44" height="40" rx="7" fill="#2a2a2c" stroke="#5a5a5e" stroke-width="1.5" />
+  <rect x="282" y="70" width="44" height="36" rx="7" fill="#3a3a3c" stroke="#5a5a5e" stroke-width="1.5" />
+  <text x="304.0" y="93" fill="#ffcc00" font-size="14" text-anchor="middle" font-family="Menlo, Consolas, monospace">%</text>
+  <text x="94" y="136" fill="#d8d8d8" font-size="11" text-anchor="middle">① 同時に押す</text>
+  <text x="94" y="152" fill="#8e8e93" font-size="11" text-anchor="middle">これが prefix</text>
+  <text x="304" y="136" fill="#d8d8d8" font-size="11" text-anchor="middle">② 続けて押す</text>
+  <text x="304" y="152" fill="#8e8e93" font-size="11" text-anchor="middle">何をするかを決めるキー</text>
+  <text x="20" y="186" fill="#8e8e93" font-size="11">3 つを同時には押しません。</text>
+</svg>
