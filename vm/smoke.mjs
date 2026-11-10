@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { STATE_FILE } from '../vm-config.js';
 
 const site = process.argv[2] ?? 'dist/site';
 const chromePath = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -40,6 +41,7 @@ try {
   const pending = new Map();
   const problems = [];
   const requested = [];
+  const paused = []; // Fetch.enable で止めているリクエスト
   ws.addEventListener('message', ({ data }) => {
     const { id, result, error, method, params } = JSON.parse(data);
     if (id) {
@@ -50,6 +52,7 @@ try {
     if (method === 'Log.entryAdded' && params.entry.level === 'error') problems.push(params.entry.text);
     if (method === 'Runtime.exceptionThrown') problems.push(params.exceptionDetails.exception?.description ?? params.exceptionDetails.text);
     if (method === 'Network.requestWillBeSent') requested.push(params.request.url);
+    if (method === 'Fetch.requestPaused') paused.push(params.request.url);
   });
   const send = (method, params = {}, sessionId) =>
     new Promise((resolve, reject) => {
@@ -373,6 +376,17 @@ try {
   const lessonRestored = await rectOf('#lesson');
   assert.deepEqual([lessonRestored.left, lessonRestored.top], [lessonRect.left, lessonRect.top], 'ドラッグした位置が残っています');
 
+  // 狭い画面でも文字の大きさはそのままで、桁数と行数が減って収まる。VM の端末も同じ大きさになる
+  await page('Emulation.setDeviceMetricsOverride', { width: 600, height: 500, deviceScaleFactor: 0, mobile: false });
+  await waitUntil('桁数と行数の縮小', async () => { const { cols, rows } = await gridSize(); return cols < normalGrid.cols && rows < normalGrid.rows; });
+  const narrowGrid = await gridSize();
+  assert.equal(await fontSize(), 14, '狭い画面で文字の大きさが変わりました');
+  await waitUntil('VM の端末の大きさの縮小', () => clientIs(narrowGrid));
+  assert.ok(await evaluate(`document.documentElement.scrollHeight <= innerHeight && tmux.scrollWidth <= tmux.clientWidth`), '狭い画面に収まっていません');
+  await page('Emulation.clearDeviceMetricsOverride');
+  await waitUntil('桁数と行数の復帰', async () => JSON.stringify(await gridSize()) === JSON.stringify(normalGrid));
+  await waitUntil('VM の端末の大きさの復帰', () => clientIs(normalGrid));
+
   // 欄を消してもレッスンは進み続ける
   await clickOn('#lesson .minimize');
   assert.equal((await rectOf('#lesson')).height, (await rectOf('#lesson .titlebar')).height + 2, '欄を最小化できません');
@@ -403,9 +417,13 @@ try {
   assert.ok(busyAfter < busyBefore / 2, `端末を消しても VM が止まっていません: ${busyBefore} → ${busyAfter}`);
 
   // 読み込み中に消しても例外にならず、読み込み後に VM が動き出さない
+  // 進捗バーが見えている時間は短く、ポーリングでは捉えられないことがあるので、状態ファイルの転送を止めておく
+  await page('Fetch.enable', { patterns: [{ urlPattern: `*/${STATE_FILE}` }] });
   await page('Page.reload');
+  await waitUntil('状態ファイルの転送の開始', () => paused.length > 0);
   await waitUntil('読み込みの開始', () => evaluate(`!!document.querySelector('tmux-terminal progress')`).catch(() => false));
   await clickOn(`${terminalWindow} .close`);
+  await page('Fetch.disable'); // 止めていた転送はここから進む
   await sleep(8000); // 状態ファイルの読み込みと起動が終わるのを待つ
   const busyLoaded = await busyRatio();
   assert.ok(busyLoaded < busyBefore / 2, `読み込み中に消しても VM が動き出しました: ${busyBefore} → ${busyLoaded}`);

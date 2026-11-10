@@ -284,7 +284,7 @@ const maximizeTerminal = terminalWindow.querySelector('.maximize');
 for (const win of [lessonWindow, terminalWindow]) {
   win.querySelector('.close').addEventListener('click', () => {
     win.hidden = true; // 欄の中身は $() で参照し続けるので、DOM からは外さない
-    if (win !== terminalWindow) return;
+    if (win !== terminalWindow) return fitTerminal(); // 欄が消えた分だけ端末を広げられる
     terminal.remove(); // VM も破棄される
     stoppedMessage = TERMINAL_CLOSED_MESSAGE;
     $('status').textContent = stoppedMessage;
@@ -300,7 +300,8 @@ for (const win of [lessonWindow, terminalWindow]) {
 maximizeTerminal.addEventListener('click', () => {
   if (document.fullscreenElement) return document.exitFullscreen();
   if (terminalWindow.classList.contains('minimized')) minimizeTerminal.click();
-  navigator.keyboard?.lock(['Escape']); // Esc をコピーモードで使えるようにする。対応ブラウザでは Esc の長押しで解除する
+  // Esc をコピーモードで使えるようにする。対応ブラウザでは Esc の長押しで解除する。できない環境では reject するが、フルスクリーンには影響しない
+  navigator.keyboard?.lock(['Escape']).catch(() => {});
   document.documentElement.requestFullscreen();
 });
 
@@ -312,19 +313,22 @@ $('license').addEventListener('click', async (event) => {
   if (code !== 0) open($('license').href);
 });
 
-// フルスクリーンでは文字の大きさはそのままで、桁数と行数を画面いっぱいに増やす。
-// ふだんは元の桁数と行数で、画面に収まらないときだけ文字を小さくして収める。
+// 文字の大きさはいつも同じで、桁数と行数を変えて収める。フルスクリーンでは画面いっぱいに増やす。
+// ふだんは元の桁数と行数で、画面に収まらないときだけ減らす。
 // 桁数と行数が変わるとハイライトの位置もずれるので、描き直す
 function fitTerminal() {
-  terminal.fit();
-  if (document.fullscreenElement) return terminal.fill(terminal.clientWidth, terminal.clientHeight).then(drawHighlight);
-  terminal.fill().then(drawHighlight);
   if (!terminal.isConnected || terminalWindow.classList.contains('minimized')) return;
-  const tooTall = document.documentElement.scrollHeight - innerHeight;
-  const tooWide = terminal.scrollWidth - terminal.clientWidth;
-  if (tooTall > 0 || tooWide > 0) terminal.fit(terminal.clientWidth, tooTall > 0 ? terminal.clientHeight - tooTall : Infinity);
+  if (document.fullscreenElement) return terminal.fill(terminal.clientWidth, terminal.clientHeight).then(drawHighlight);
+  // 元の桁数と行数のときの大きさで配置させて、はみ出す分を測る。すぐ戻すので描画はされない
+  const { width, height } = terminal.naturalSize;
+  Object.assign(terminal.style, { flex: 'none', width: `${width}px`, height: `${height}px` });
+  const tooWide = Math.max(0, terminal.offsetWidth - terminalWindow.clientWidth);
+  const tooTall = Math.max(0, document.documentElement.scrollHeight - innerHeight);
+  Object.assign(terminal.style, { flex: '', width: '', height: '' });
+  terminal.fill(width - tooWide, height - tooTall).then(drawHighlight);
 }
 addEventListener('resize', fitTerminal);
+terminal.addEventListener('vm-ready', fitTerminal); // 起動前は桁数と行数を変えられない
 document.addEventListener('fullscreenchange', () => {
   const on = Boolean(document.fullscreenElement);
   maximizeTerminal.setAttribute('aria-pressed', on);
