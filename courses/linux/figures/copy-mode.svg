@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 200" font-family="system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif" font-size="12">
+  <title>画面の外へ流れた出力は履歴に残っていて、コピーモードで遡れる</title>
+  <rect x="24" y="8" width="150" height="184" rx="6" fill="#1c1c1e" stroke="#5a5a5e" stroke-width="1.5" stroke-dasharray="4 3" />
+  <rect x="28" y="13" width="142" height="74" rx="4" fill="#ffcc0014" stroke="#ffcc00" stroke-width="2" />
+  <rect x="24" y="114" width="150" height="78" rx="6" fill="#1c1c1e" stroke="#d8d8d8" stroke-width="2" />
+  <text x="38" y="28" fill="#d8d8d8" font-size="10" font-family="Menlo, Consolas, monospace">1</text>
+  <text x="38" y="41" fill="#d8d8d8" font-size="10" font-family="Menlo, Consolas, monospace">2</text>
+  <text x="38" y="54" fill="#d8d8d8" font-size="10" font-family="Menlo, Consolas, monospace">3</text>
+  <text x="38" y="67" fill="#d8d8d8" font-size="10" font-family="Menlo, Consolas, monospace">4</text>
+  <text x="38" y="80" fill="#d8d8d8" font-size="10" font-family="Menlo, Consolas, monospace">5</text>
+  <text x="38" y="130" fill="#d8d8d8" font-size="10" font-family="Menlo, Consolas, monospace">196</text>
+  <text x="38" y="143" fill="#d8d8d8" font-size="10" font-family="Menlo, Consolas, monospace">197</text>
+  <text x="38" y="156" fill="#d8d8d8" font-size="10" font-family="Menlo, Consolas, monospace">198</text>
+  <text x="38" y="169" fill="#d8d8d8" font-size="10" font-family="Menlo, Consolas, monospace">199</text>
+  <text x="38" y="182" fill="#d8d8d8" font-size="10" font-family="Menlo, Consolas, monospace">200</text>
+  <text x="99" y="104" fill="#8e8e93" font-size="12" text-anchor="middle">⋮</text>
+  <path d="M130 110V94m-6 7l6-7 6 7" fill="none" stroke="#ffcc00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M186 50h14" stroke="#ffcc00" stroke-width="1.5" />
+  <text x="208" y="38" fill="#ffcc00" font-weight="600">コピーモード</text>
+  <text x="208" y="54" fill="#8e8e93" font-size="11">画面の外へ流れた出力（履歴）を</text>
+  <text x="208" y="70" fill="#8e8e93" font-size="11">遡って、検索やコピーができる</text>
+  <path d="M186 152h14" stroke="#d8d8d8" stroke-width="1.5" />
+  <text x="208" y="150" fill="#d8d8d8" font-weight="600">いま見えている画面</text>
+  <text x="208" y="166" fill="#8e8e93" font-size="11">ふだん操作できるのはここだけ</text>
+</svg>

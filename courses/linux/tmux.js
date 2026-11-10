@@ -22,11 +22,13 @@ export default {
       steps: [
         {
           id: 'status-bar',
+          figure: { name: 'hierarchy', alt: 'セッションの中にウィンドウがあり、ウィンドウの中にペインがある。セッションは作業のまとまり、ウィンドウはタブのように切り替える画面、ペインはウィンドウを分けた 1 区画。' },
           say: '下の帯がステータスバーです。左端の `[lesson]` がセッション名、その右の `0:sh*` が今いるウィンドウです。始める前に、日本語入力をオフにしてください。',
           highlight: STATUS_BAR,
         },
         {
           id: 'split-right',
+          figure: { name: 'prefix', alt: 'Ctrl と b を同時に押して指を離し、続けて % を押す。3 つを同時には押さない。' },
           say: 'tmux のショートカットは 2 段階です。`Ctrl-b`（prefix）を押して指を離し、続けて `%` を押すと、画面が左右に分かれます。',
           do: ['C-b', '%'],
           check: splitRight,
@@ -94,6 +96,7 @@ export default {
       steps: [
         {
           id: 'new-window',
+          figure: { name: 'windows', alt: '1 つのセッションにウィンドウをいくつも作れて、表示するのは 1 つだけ。ステータスバーに一覧が並び、* が今いるウィンドウ、- が 1 つ前にいたウィンドウ。' },
           say: 'ウィンドウはブラウザのタブのようなものです。`Ctrl-b c` で新しく作ります。ステータスバーに増えたのを確かめましょう。',
           do: ['C-b', 'c'],
           check: windows(2),
@@ -158,6 +161,7 @@ export default {
         },
         {
           id: 'detach',
+          figure: { name: 'detach', alt: '端末と tmux サーバーは別のもの。デタッチすると接続だけが切れ、セッションと top はサーバーの中で動き続ける。tmux attach でつなぎ直す。' },
           say: '`Ctrl-b d` で tmux から離れます（デタッチ）。SSH が切れたときも同じ状態になります。',
           do: ['C-b', 'd'],
           check: `! ${clientAttached}`,
@@ -181,6 +185,7 @@ export default {
         },
         {
           id: 'new-session',
+          figure: { name: 'sessions', alt: 'tmux の中にセッション lesson と work が並んでいる。端末が表示しているのはどれか 1 つで、切り替えられる。' },
           say: '`tmux new -d -s work` で、裏にもう 1 つセッションを作ります。',
           do: ['tmux new -d -s work', 'Enter'],
           check: 'tmux has-session -t work',
@@ -226,6 +231,7 @@ export default {
         },
         {
           id: 'enter-copy-mode',
+          figure: { name: 'copy-mode', alt: 'ふだん操作できるのは、いま見えている画面だけ。コピーモードでは、画面の外へ流れた出力を遡って、検索やコピーができる。' },
           say: '先頭は画面の外へ流れました。`Ctrl-b [` でコピーモードに入ります。',
           do: ['C-b', '['],
           check: display('#{pane_mode}', 'copy-mode'),

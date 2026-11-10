@@ -1,6 +1,6 @@
 // Linux コース。シナリオは関数を含まない純粋なデータで、JSON.stringify しても何も失われない。
 //
-// Course  { id, title, terminal?, vm?, setup?, alive?, license?, modules: Module[] }
+// Course  { id（このディレクトリの名前と同じにする。図の場所に使う）, title, terminal?, vm?, setup?, alive?, license?, modules: Module[] }
 //   terminal   端末の要素名。サイト直下の同じ名前の .js が定義する。省略すると vm-terminal（tmux の通知がない素の端末）
 //   vm         VM のビルドで使う。VM に入れるものは、このディレクトリの vm/Dockerfile に書く
 //     boot       ログイン直後のシェルに打つ 1 行のコマンド。その結果の画面を、ページを開いたときの最初の状態として保存する
@@ -12,8 +12,9 @@
 // Module  { id, title, lessons: Lesson[] }  配列の順が受講順
 // Lesson  { id, title, goal, setup?, steps: Step[] }
 //   setup      そのレッスンだけの準備。Course の setup の後に実行し、失敗したときの扱いも同じ
-// Step    { id, say, do?, check?, hint?, highlight? }
+// Step    { id, say, figure?, do?, check?, hint?, highlight? }
 //   say        学習者に見せる指示。プレーンテキストで、`…` だけをキーやコマンドとして表示する
+//   figure     新しい概念を説明する図。{ name, alt } で、figures/<name>.svg を表示する。440×200 で描き、alt に図の内容を書く
 //   do         正解の操作。tmux send-keys の記法で、要素はキー名かそのまま打つ文字列。「答えを見る」と npm test に使う
 //   check      VM で実行する 1 行のシェルコマンド。繰り返し実行し、終了コード 0 で合格。省略すると「次へ」で進む
 //   hint       つまずいたときに見せる補足。check のあるステップでは、30 秒進まないと自動で開く

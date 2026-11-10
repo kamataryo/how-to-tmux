@@ -62,6 +62,24 @@ function moveSteps(change) {
   }
 }
 
+// 図はコースの figures/ にある SVG で、欄の幅で読める大きさに描いてある。クリックすると大きく開く。
+// 終えたステップでは「図を見る」だけを残し、あとからでも開けるようにする
+function figureOf({ name, alt }) {
+  const button = document.createElement('button');
+  button.className = 'figure';
+  button.title = '図を大きく表示';
+  const image = Object.assign(document.createElement('img'), { src: `./courses/${course.id}/figures/${name}.svg`, alt });
+  const label = document.createElement('span');
+  label.textContent = '図を見る';
+  button.append(image, label);
+  button.addEventListener('click', (event) => {
+    event.stopPropagation(); // クリックで端末へフォーカスを戻す処理に渡さない
+    Object.assign($('figure-viewer').querySelector('img'), { src: image.src, alt });
+    $('figure-viewer').showModal();
+  });
+  return button;
+}
+
 function showStep(step) {
   const item = document.createElement('li');
   item.dataset.step = step.id;
@@ -69,6 +87,7 @@ function showStep(step) {
   const say = document.createElement('p');
   say.append(...inline(step.say));
   item.append(say);
+  if (step.figure) item.append(figureOf(step.figure));
   if (step.hint) item.append(folded('ヒント', ...inline(step.hint)));
   if (step.do) {
     const label = (token) => KEY_LABELS[token] ?? token.replace(/^C-/, 'Ctrl-');
@@ -223,6 +242,7 @@ addEventListener('click', (event) => {
 addEventListener(
   'keydown',
   (event) => {
+    if ($('figure-viewer').open) return; // 図を開いている間のキーは図が受け取る
     // 端末は Tab キーも受け取るので、キーボードだけで欄へ移れるようにする
     if (event.key === 'F6') {
       event.preventDefault();
@@ -241,6 +261,19 @@ addEventListener(
   },
   true,
 );
+
+// 大きく開いた図は、クリックか Esc、Enter、Space で閉じる。フルスクリーンでは Esc を取り上げているので、自分で閉じる
+const figureViewer = $('figure-viewer');
+figureViewer.addEventListener('click', (event) => {
+  event.stopPropagation();
+  figureViewer.close();
+});
+figureViewer.addEventListener('keydown', (event) => {
+  if (!['Escape', 'Enter', ' '].includes(event.key)) return;
+  event.preventDefault();
+  figureViewer.close();
+});
+figureViewer.addEventListener('close', () => terminal.focus());
 
 // ウィンドウの枠。赤は消す（再読み込みまで戻らない）、黄は最小化、緑はフルスクリーン
 const lessonWindow = $('lesson');

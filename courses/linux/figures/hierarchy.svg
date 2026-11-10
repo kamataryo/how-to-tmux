@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 200" font-family="system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif" font-size="12">
+  <title>セッション、ウィンドウ、ペインの入れ子</title>
+  <rect x="8" y="14" width="212" height="172" rx="8" fill="none" stroke="#6aa5ff" stroke-width="2" />
+  <text x="18" y="32" fill="#6aa5ff" font-size="11">セッション lesson</text>
+  <rect x="34" y="42" width="174" height="118" rx="5" fill="#242426" stroke="#7bc96f" stroke-width="2" opacity="0.55" />
+  <text x="200" y="56" fill="#7bc96f" font-size="10" text-anchor="end" opacity="0.8">ウィンドウ 1</text>
+  <rect x="20" y="60" width="174" height="116" rx="5" fill="#2a2a2c" stroke="#7bc96f" stroke-width="2" />
+  <text x="28" y="76" fill="#7bc96f" font-size="11">ウィンドウ 0</text>
+  <rect x="28" y="84" width="76" height="84" rx="3" fill="#1c1c1e" stroke="#ffcc00" stroke-width="2" />
+  <rect x="110" y="84" width="76" height="84" rx="3" fill="#1c1c1e" stroke="#ffcc00" stroke-width="2" />
+  <text x="66" y="130" fill="#ffcc00" font-size="11" text-anchor="middle">ペイン</text>
+  <text x="148" y="130" fill="#ffcc00" font-size="11" text-anchor="middle">ペイン</text>
+  <rect x="240" y="35" width="10" height="10" rx="2" fill="none" stroke="#6aa5ff" stroke-width="2" />
+  <text x="258" y="44" fill="#d8d8d8" font-weight="600">セッション</text>
+  <text x="258" y="60" fill="#8e8e93" font-size="11">作業のまとまり。離れても残る</text>
+  <rect x="240" y="91" width="10" height="10" rx="2" fill="none" stroke="#7bc96f" stroke-width="2" />
+  <text x="258" y="100" fill="#d8d8d8" font-weight="600">ウィンドウ</text>
+  <text x="258" y="116" fill="#8e8e93" font-size="11">タブのように切り替える画面</text>
+  <rect x="240" y="147" width="10" height="10" rx="2" fill="none" stroke="#ffcc00" stroke-width="2" />
+  <text x="258" y="156" fill="#d8d8d8" font-weight="600">ペイン</text>
+  <text x="258" y="172" fill="#8e8e93" font-size="11">ウィンドウを分けた 1 区画</text>
+</svg>
