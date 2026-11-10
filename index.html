@@ -462,7 +462,10 @@
         margin-top: 4px;
         font-size: 13px;
       }
+      /* 幅を文字に合わせる。欄の幅いっぱいだと、フォーカスの枠が #steps の overflow で切れる */
       summary {
+        width: fit-content;
+        border-radius: 4px;
         cursor: pointer;
         color: #a0a0a0;
       }
