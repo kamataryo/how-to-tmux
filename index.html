@@ -43,8 +43,10 @@
       }
       main {
         display: grid;
-        grid-template-columns: minmax(max-content, 1fr) minmax(320px, 1fr);
+        /* 列を中身の幅にして中央へ寄せる。1fr で分けると、広い画面で 2 つのウィンドウが左右に離れる */
+        grid-template-columns: max-content minmax(320px, 520px);
         gap: 16px;
+        place-content: center;
         place-items: center;
         box-sizing: border-box;
         min-height: 100dvh;
